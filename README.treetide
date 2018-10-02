@@ -1,0 +1,32 @@
+# Locally added files
+
+shell.nix:
+    Nix env needed to build kythe with bazel.
+
+invoke-build.sh:
+    Wrapper for 'bazel build' with proper passing of NIX_* env vars.
+
+cp-bin.sh:
+    Puts build artifacts to a local dir.
+
+# Notes
+
+To compile Kythe:
+  - in 'nix-shell -p asciidoc sourceHighlight'
+      - tools/modules/update.sh
+  - in 'nix-shell' (uses shell.nix)
+      - sh invoke-build.sh kythe/cxx/extractor/...
+        - if it complains with header include violation (or something like that), wipe ~/.cache/bazel and retry.
+        - BUG? why isn't libncursesw.so.6 picked up? even added ncurses.dev to nix-shell packages. It seems to be in NIX_LDPATH.
+          - cp-bin.sh script now sets the rpath manually so it's picked up.
+      - using invoke-build.sh so it adds NIX_* env vars to --action_env
+        - Note that some kythe tests using the extractor/indexer using custom rules don't get the env propagated thus fail to find libuuid. Commented on https://github.com/bazelbuild/bazel/issues/3320.
+
+To crossref Kythe itself:
+  - bazel build kythe/go/serving/tools/... --experimental_action_listener kythe/go/extractors/cmd/bazel:extract_kzip_go
+  - find and index the kzips
+      - tree bazel-out/k8-fastbuild/extra_actions/kythe/go/extractors/cmd/bazel/extra_action/kythe/
+      - ./bazel-bin/kythe/go/indexer/cmd/go_indexer/linux_amd64_stripped/go_indexer $(find kythe-kzips -name '*.kzip') | ...write_entries...
+  - the xrefs don't seem to pick up kythe.io prefix, so things are not properly xrefd
+    - AI: maybe open issue
+
