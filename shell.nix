@@ -3,6 +3,6 @@
 with pkgs;
 { kythe-compile = stdenv.mkDerivation {
     name = "kythe-compile";
-    buildInputs = [ zlib asciidoc sourceHighlight libuuid ncurses.dev ];
+    buildInputs = [ bazel cmake zlib asciidoc sourceHighlight libuuid.dev ncurses.dev ];
 };
 }

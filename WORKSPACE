@@ -8,6 +8,32 @@ load("//:version.bzl", "check_version")
 # Bazel and our maximum supported version of Bazel.
 check_version("0.20", "0.22")
 
+### nixpkgs setup
+http_archive(
+  name = "io_tweag_rules_nixpkgs",
+  strip_prefix = "rules_nixpkgs-0.5.1",
+  urls = ["https://github.com/tweag/rules_nixpkgs/archive/v0.5.1.tar.gz"],
+)
+
+load("@io_tweag_rules_nixpkgs//nixpkgs:nixpkgs.bzl", "nixpkgs_package", "nixpkgs_git_repository")
+
+nixpkgs_git_repository(
+  name = "nixpkgs",
+  revision = "def5124ec8367efdba95a99523dd06d918cb0ae8",
+)
+
+nixpkgs_package(
+  name = "bison",
+  repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
+)
+
+nixpkgs_package(
+  name = "flex",
+  repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
+)
+
+### end of nixpkgs setup
+
 http_archive(
     name = "bazel_toolchains",
     sha256 = "0ffaab86bed3a0c8463dd63b1fe2218d8cad09e7f877075bf028f202f8df1ddc",

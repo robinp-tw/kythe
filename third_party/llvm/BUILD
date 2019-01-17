@@ -76,7 +76,8 @@ cc_library(
     ],
     linkopts = [
         "-ldl",
-        "-lcurses",
+        # Changed until https://github.com/NixOS/nixpkgs/issues/54112 is sorted.
+        "-lncurses",
         "-lm",
         "-lpthread",
     ],

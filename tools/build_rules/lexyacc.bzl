@@ -7,12 +7,15 @@ def genlex(name, src, out, includes = []):
       out: The generated source file.
       includes: A list of headers included by the .lex file.
     """
-    cmd = "flex -o $(@D)/%s $(location %s)" % (out, src)
+    cmd = "$(location @flex//:bin/flex) -o $(@D)/%s $(location %s)" % (out, src)
     native.genrule(
         name = name,
         outs = [out],
         srcs = [src] + includes,
         cmd = cmd,
+        tools = [
+          "@flex//:bin/flex"
+        ],
     )
 
 def genyacc(name, src, header_out, source_out, extra_outs = []):
@@ -26,10 +29,13 @@ def genyacc(name, src, header_out, source_out, extra_outs = []):
       extra_outs: Additional generated outputs.
     """
     arg_adjust = "$$(bison --version | grep -qE '^bison .* 3\..*' && echo -Wno-deprecated)"
-    cmd = "bison %s -o $(@D)/%s $(location %s)" % (arg_adjust, source_out, src)
+    cmd = "$(location @bison//:bin/bison) %s -o $(@D)/%s $(location %s)" % (arg_adjust, source_out, src)
     native.genrule(
         name = name,
         outs = [source_out, header_out] + extra_outs,
         srcs = [src],
         cmd = cmd,
+        tools = [
+          "@bison//:bin/bison"
+        ],
     )
