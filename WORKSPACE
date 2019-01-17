@@ -32,6 +32,11 @@ nixpkgs_package(
   repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
 )
 
+nixpkgs_package(
+  name = "gzip",
+  repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
+)
+
 ### end of nixpkgs setup
 
 http_archive(

@@ -143,6 +143,7 @@ go_extract = rule(
 def _go_entries(ctx):
     kzip = ctx.attr.kzip.kzip
     indexer = ctx.files._indexer[-1]
+    gzip = [f for f in ctx.files.gzip if f.path.endswith("/gzip")][0]
     iargs = [indexer.path]
     output = ctx.outputs.entries
 
@@ -154,7 +155,7 @@ def _go_entries(ctx):
     if ctx.attr.metadata_suffix:
         iargs += ["-meta", ctx.attr.metadata_suffix]
 
-    iargs += [kzip.path, "| gzip >" + output.path]
+    iargs += [kzip.path, "| ", gzip.path, " >" + output.path]
 
     cmds = ["set -e", "set -o pipefail", " ".join(iargs), ""]
     ctx.actions.run_shell(
@@ -162,7 +163,10 @@ def _go_entries(ctx):
         command = "\n".join(cmds),
         outputs = [output],
         inputs = [kzip],
-        tools = [ctx.executable._indexer],
+        tools = [
+            ctx.executable._indexer,
+            gzip,
+        ],
     )
     return [KytheEntries(compressed = depset([output]), files = depset())]
 
@@ -187,6 +191,11 @@ go_entries = rule(
             default = Label("//kythe/go/indexer/cmd/go_indexer"),
             executable = True,
             cfg = "host",
+        ),
+
+        # Where to find 'gzip' toolset.
+        "gzip": attr.label(
+            default = Label("@gzip//:bin"),
         ),
     },
     outputs = {"entries": "%{name}.entries.gz"},
