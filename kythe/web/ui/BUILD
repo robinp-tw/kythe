@@ -20,6 +20,9 @@ genrule(
         "lein=\"$$PWD/$(location //third_party/leiningen:lein)\"",
         "export HOME=/tmp/lein",
         "mkdir -p $$HOME",
+        "export WGET_DIR=$$(dirname $(location @wget//:bin))",
+        "export JAVA_DIR=$$(dirname $(location @jre//:bin/java))",
+        "export PATH=$$(readlink -f $$WGET_DIR):$$(readlink -f $$JAVA_DIR):$$PATH",
         "cd kythe/web/ui",
         "$$lein deps",
         "$$lein cljsbuild once prod",
@@ -31,5 +34,9 @@ genrule(
     heuristic_label_expansion = False,
     local = 1,
     tags = ["manual"],
-    tools = ["//third_party/leiningen:lein"],
+    tools = [
+        "//third_party/leiningen:lein",
+        "@wget//:bin",
+        "@jre//:bin/java",
+    ],
 )

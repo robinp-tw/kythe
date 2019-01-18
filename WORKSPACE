@@ -37,6 +37,16 @@ nixpkgs_package(
   repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
 )
 
+nixpkgs_package(
+  name = "wget",
+  repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
+)
+
+nixpkgs_package(
+  name = "jre",
+  repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
+)
+
 ### end of nixpkgs setup
 
 http_archive(
