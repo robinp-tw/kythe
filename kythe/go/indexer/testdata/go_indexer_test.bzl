@@ -143,7 +143,7 @@ go_extract = rule(
 def _go_entries(ctx):
     kzip = ctx.attr.kzip.kzip
     indexer = ctx.files._indexer[-1]
-    gzip = [f for f in ctx.files.gzip if f.path.endswith("/gzip")][0]
+    gzip = [f for f in ctx.files._gzip if f.path.endswith("/gzip")][0]
     iargs = [indexer.path]
     output = ctx.outputs.entries
 
@@ -194,7 +194,7 @@ go_entries = rule(
         ),
 
         # Where to find 'gzip' toolset.
-        "gzip": attr.label(
+        "_gzip": attr.label(
             default = Label("@gzip//:bin"),
         ),
     },
