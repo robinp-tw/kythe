@@ -54,6 +54,9 @@ genrule(
     cmd = " ".join([
         "export GENDIR=$(GENDIR);",
         "export BINDIR=$(BINDIR);",
+        "export TAR_DIR=$$(dirname $(location @gnutar//:bin/tar));",
+        "export GZIP_DIR=$$(dirname $(location @gzip//:bin/gzip));",
+        "export PATH=$$(readlink -f $$TAR_DIR):$$(readlink -f $$GZIP_DIR):$$PATH;",
         "$(location package_release.sh)",
         "$(location //kythe/go/platform/tools/shasum_tool)",
         "$(location kythe-" + release_version + ".tar.gz)",
@@ -82,6 +85,8 @@ genrule(
     tools = [
         "package_release.sh",
         "//kythe/go/platform/tools/shasum_tool",
+        "@gzip//:bin/gzip",
+        "@gnutar//:bin/tar",
     ],
 )
 
