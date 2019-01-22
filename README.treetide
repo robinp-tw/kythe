@@ -3,12 +3,6 @@
 shell.nix:
     Nix env needed to build kythe with bazel.
 
-invoke-build.sh:
-    Wrapper for 'bazel build' with proper passing of NIX_* env vars.
-    Note: maybe this is not needed, if an appropriate .bazelrc is
-    prepared - see nixpkgs/..../bazel/default.nix for inspiration?
-    Why is this .bazelrc not exposed as a template in the nixpkgs'd bazel?
-
 cp-bin.sh:
     Puts build artifacts to a local dir.
     Note: those link to random libs in the current nix-shell, which can be
@@ -19,20 +13,26 @@ cp-bin.sh:
 
 To compile Kythe:
   - in 'nix-shell' (uses shell.nix)
-      - tools/modules/update.sh
+      - on first checkout, execute 'tools/modules/update.sh'
 
-      - sh invoke-build.sh kythe/release
+      - bazel build kythe/release
+        - use 'bazel build -s' if anything goes wrong to see invocation details
 
-      - sh invoke-build.sh kythe/cxx/extractor/...
-        - if it complains with header include violation (or something like that), wipe ~/.cache/bazel and retry.
+      - if bazel complains about missing headers, then
+        - 'bazel clean' and retry
+        - if still, then wipe ~/.cache/bazel and retry.
+        - note: this often happens when entering the nix-shell again, with old
+          cached nix artifacts getting stale.
+
+      - bazel build kythe/cxx/extractor/...
         - BUG? why isn't libncursesw.so.6 picked up? even added ncurses.dev to nix-shell packages. It seems to be in NIX_LDPATH.
           - See https://github.com/NixOS/nixpkgs/issues/54112.
           - Changed to link against -lncurses for now.
 
-      - using invoke-build.sh so it adds NIX_* env vars to --action_env
-        - Note that some kythe tests using the extractor/indexer using custom rules don't get the env propagated thus fail to find libuuid. Commented on https://github.com/bazelbuild/bazel/issues/3320.
-          - But this happens only on certain build paths, oddly.
-          - Directly building those target works (?).
+      - was using invoke-build.sh so it adds NIX_* env vars to --action_env
+        - But this was buggy, env was lost in various ways (sometimes not
+          propagated to host config, or through certain rules). Obsoleted
+          by custom .bazelrc.
 
 To crossref Kythe itself (TODO update):
   - bazel build kythe/go/serving/tools/... --experimental_action_listener kythe/go/extractors/cmd/bazel:extract_kzip_go

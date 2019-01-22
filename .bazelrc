@@ -1,3 +1,6 @@
+# Nix specific stuff
+import .bazelrc.nix
+
 # Remote Build Execution requires a strong hash function, such as SHA256.
 startup --host_jvm_args=-Dbazel.DigestFunction=SHA256
 

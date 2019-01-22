@@ -1,3 +1,6 @@
+# Nix artifacts
+.bazelrc.nix
+
 # Kythe artifacts
 *.kindex
 *.ldb
