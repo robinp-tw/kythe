@@ -43,6 +43,11 @@ nixpkgs_package(
 )
 
 nixpkgs_package(
+  name = "curl",
+  repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
+)
+
+nixpkgs_package(
   name = "jre",
   repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
 )

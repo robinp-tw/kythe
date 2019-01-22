@@ -43,6 +43,7 @@
 
 set -e
 
+: ${CURL?:missing curl tool dep}
 : ${KYTHE_WRITE_TABLES?:missing write_tables}
 : ${KYTHE_WRITE_ENTRIES?:missing write_entries}
 : ${KYTHE_ENTRYSTREAM?:missing entrystream}
@@ -76,7 +77,7 @@ COUNTDOWN=16
 while :; do
   if [[ -e "${PORT_FILE}" && "$(cat ${PORT_FILE} | wc -l)" -eq 1 ]]; then
     LISTEN_AT="localhost:$(< ${PORT_FILE})"
-    trap 'curl -s "$LISTEN_AT/quitquitquit" || true' EXIT ERR INT
+    trap '$CURL -s "$LISTEN_AT/quitquitquit" || true' EXIT ERR INT
     break
   fi
   if [[ $((COUNTDOWN--)) -eq 0 ]]; then
@@ -87,7 +88,7 @@ while :; do
 done
 COUNTDOWN=16
 while :; do
-  curl -sf "$LISTEN_AT/alive" >/dev/null && break
+  $CURL -sf "$LISTEN_AT/alive" >/dev/null && break
   echo "Waiting for server ($COUNTDOWN seconds remaining)..." >&2
   sleep 1s
   if [[ $((COUNTDOWN--)) -eq 0 ]]; then

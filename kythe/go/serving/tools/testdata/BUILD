@@ -46,6 +46,7 @@ shell_tool_test(
     scriptfile = "kwazthis_test.sh",
     tools = {
         "JQ": "@com_github_stedolan_jq//:jq",
+        "CURL": "@curl//:bin/curl",
         "KWAZTHIS": "//kythe/go/serving/tools:kwazthis",
         "KYTHE_ENTRYSTREAM": "//kythe/go/platform/tools/entrystream",
         "KYTHE_HTTP_SERVER": "//kythe/go/test/tools:http_server",
