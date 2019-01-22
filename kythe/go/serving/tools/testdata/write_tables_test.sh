@@ -50,11 +50,11 @@ check_diff() {
   gzip -kdf "$gold.gz"
 
   echo
-  if ! diff -q "$gold" "$new"; then
+  if ! $diff -q "$gold" "$new"; then
     $jq .key "$gold" > "$TEST_TMPDIR/gold.keys"
     $jq .key "$new" > "$TEST_TMPDIR/new.keys"
 
-    if ! diff -u "$TEST_TMPDIR/"{gold,new}.keys | diffstat -qm; then
+    if ! $diff -u "$TEST_TMPDIR/"{gold,new}.keys | $diffstat -qm; then
       echo "  Key samples:"
       echo "    Unique to gold:"
       comm -23 "$TEST_TMPDIR/"{gold,new}.keys | sort -R | head -n3

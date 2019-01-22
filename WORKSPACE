@@ -57,6 +57,16 @@ nixpkgs_package(
   repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
 )
 
+nixpkgs_package(
+  name = "diffutils",
+  repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
+)
+
+nixpkgs_package(
+  name = "diffstat",
+  repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
+)
+
 ### end of nixpkgs setup
 
 http_archive(

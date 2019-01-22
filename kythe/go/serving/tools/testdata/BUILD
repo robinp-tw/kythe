@@ -30,6 +30,8 @@ shell_tool_test(
     ],
     scriptfile = "write_tables_test.sh",
     tools = {
+        "diff": "@diffutils//:bin/diff",
+        "diffstat": "@diffstat//:bin/diffstat",
         "entrystream": "//kythe/go/platform/tools/entrystream",
         "jq": "@com_github_stedolan_jq//:jq",
         "scan_leveldb": "//kythe/go/util/tools/scan_leveldb",
