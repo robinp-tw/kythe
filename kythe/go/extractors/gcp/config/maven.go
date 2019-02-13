@@ -17,8 +17,9 @@
 package config
 
 import (
-	"fmt"
 	"path"
+	"path/filepath"
+	"strconv"
 
 	"kythe.io/kythe/go/extractors/constants"
 
@@ -29,15 +30,13 @@ import (
 
 type mavenGenerator struct{}
 
-// preArtifacts implements part of buildSystemElaborator
-func (m mavenGenerator) preArtifacts() []string {
-	return []string{path.Join(outputDirectory, "javac-extractor.err")}
-}
-
-// steps implements parts of buildSystemElaborator
-func (m mavenGenerator) steps(conf *rpb.ExtractionHint) []*cloudbuild.BuildStep {
+// extractSteps implements parts of buildSystemElaborator
+func (m mavenGenerator) extractSteps(corpus string, target *rpb.ExtractionTarget, buildID int) []*cloudbuild.BuildStep {
+	buildfile := path.Join(codeDirectory, target.Path)
+	targetPath, _ := filepath.Split(target.Path)
 	return []*cloudbuild.BuildStep{
 		javaExtractorsStep(),
+		preprocessorStep(buildfile, buildID),
 		&cloudbuild.BuildStep{
 			Name: constants.GCRMvnImage,
 			Args: []string{
@@ -50,9 +49,10 @@ func (m mavenGenerator) steps(conf *rpb.ExtractionHint) []*cloudbuild.BuildStep 
 				// The alternative here is to fall back to using clean install,
 				// which should also work.
 				"compile",
+				"test-compile",
 				"-X", // For debugging output.
 				"-f", // Points directly at a specific pom.xml file:
-				path.Join(codeDirectory, conf.Root, "pom.xml"),
+				buildfile,
 				"-Dmaven.compiler.forceJavacCompilerUse=true",
 				"-Dmaven.compiler.fork=true",
 				"-Dmaven.compiler.executable=" + constants.DefaultJavacWrapperLocation,
@@ -66,13 +66,33 @@ func (m mavenGenerator) steps(conf *rpb.ExtractionHint) []*cloudbuild.BuildStep 
 			Env: []string{
 				"KYTHE_CORPUS=" + corpus,
 				"KYTHE_OUTPUT_DIRECTORY=" + outputDirectory,
-				fmt.Sprintf("KYTHE_OUTPUT_FILE=%s", path.Join(outputDirectory, outputFilePattern)),
-				"KYTHE_ROOT_DIRECTORY=" + codeDirectory,
+				"KYTHE_ROOT_DIRECTORY=" + filepath.Join(codeDirectory, targetPath),
 				"JAVAC_EXTRACTOR_JAR=" + constants.DefaultJavaExtractorLocation,
 				"REAL_JAVAC=" + constants.DefaultJavacLocation,
 				"TMPDIR=" + outputDirectory,
 				"KYTHE_JAVA_RUNTIME_OPTIONS=-Xbootclasspath/p:" + constants.DefaultJava9ToolsLocation,
 			},
+			Id:      extractStepID + strconv.Itoa(buildID),
+			WaitFor: []string{javaArtifactsID, preStepID + strconv.Itoa(buildID)},
 		},
 	}
+}
+
+// postExtractSteps implements parts of buildSystemElaborator
+func (m mavenGenerator) postExtractSteps(corpus string) []*cloudbuild.BuildStep {
+	return []*cloudbuild.BuildStep{
+		zipMergeStep(corpus),
+	}
+}
+
+// defaultConfigFile implements parts of buildSystemElaborator
+func (m mavenGenerator) defaultExtractionTarget() *rpb.ExtractionTarget {
+	return &rpb.ExtractionTarget{
+		Path: "pom.xml",
+	}
+}
+
+// additionalArtifacts implements part of buildSystemElaborator
+func (m mavenGenerator) additionalArtifacts() []string {
+	return []string{path.Join(outputDirectory, "javac-extractor.err")}
 }

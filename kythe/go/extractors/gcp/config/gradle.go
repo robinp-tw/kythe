@@ -17,8 +17,9 @@
 package config
 
 import (
-	"fmt"
 	"path"
+	"path/filepath"
+	"strconv"
 
 	"kythe.io/kythe/go/extractors/constants"
 
@@ -29,15 +30,13 @@ import (
 
 type gradleGenerator struct{}
 
-// preArtifacts implements part of buildStepsGenerator
-func (m gradleGenerator) preArtifacts() []string {
-	return []string{path.Join(outputDirectory, "javac-extractor.err")}
-}
-
-// steps implements parts of buildSystemElaborator
-func (m gradleGenerator) steps(conf *rpb.ExtractionHint) []*cloudbuild.BuildStep {
+// extractSteps implements parts of buildSystemElaborator
+func (g gradleGenerator) extractSteps(corpus string, target *rpb.ExtractionTarget, buildID int) []*cloudbuild.BuildStep {
+	buildfile := path.Join(codeDirectory, target.Path)
+	targetPath, _ := filepath.Split(target.Path)
 	return []*cloudbuild.BuildStep{
 		javaExtractorsStep(),
+		preprocessorStep(buildfile, buildID),
 		&cloudbuild.BuildStep{
 			Name: constants.GCRGradleImage,
 			Args: []string{
@@ -54,7 +53,7 @@ func (m gradleGenerator) steps(conf *rpb.ExtractionHint) []*cloudbuild.BuildStep
 				"-S", // Prints verbose stacktraces.
 				"-d", // Logs in debug mode.
 				"-b", // Points directly at a specific build.gradle file:
-				path.Join(codeDirectory, conf.Root, "build.gradle"),
+				buildfile,
 			},
 			Volumes: []*cloudbuild.Volume{
 				&cloudbuild.Volume{
@@ -65,13 +64,33 @@ func (m gradleGenerator) steps(conf *rpb.ExtractionHint) []*cloudbuild.BuildStep
 			Env: []string{
 				"KYTHE_CORPUS=" + corpus,
 				"KYTHE_OUTPUT_DIRECTORY=" + outputDirectory,
-				fmt.Sprintf("KYTHE_OUTPUT_FILE=%s", path.Join(outputDirectory, outputFilePattern)),
-				"KYTHE_ROOT_DIRECTORY=" + codeDirectory,
+				"KYTHE_ROOT_DIRECTORY=" + filepath.Join(codeDirectory, targetPath),
 				"JAVAC_EXTRACTOR_JAR=" + constants.DefaultJavaExtractorLocation,
 				"REAL_JAVAC=" + constants.DefaultJavacLocation,
 				"TMPDIR=" + outputDirectory,
 				"KYTHE_JAVAC_RUNTIME_OPTIONS=-Xbootclasspath/p:" + constants.DefaultJava9ToolsLocation,
 			},
+			Id:      extractStepID + strconv.Itoa(buildID),
+			WaitFor: []string{javaArtifactsID, preStepID + strconv.Itoa(buildID)},
 		},
 	}
+}
+
+// postExtractSteps implements parts of buildSystemElaborator
+func (g gradleGenerator) postExtractSteps(corpus string) []*cloudbuild.BuildStep {
+	return []*cloudbuild.BuildStep{
+		zipMergeStep(corpus),
+	}
+}
+
+// defaultConfigFile implements parts of buildSystemElaborator
+func (g gradleGenerator) defaultExtractionTarget() *rpb.ExtractionTarget {
+	return &rpb.ExtractionTarget{
+		Path: "build.gradle",
+	}
+}
+
+// additionalArtifacts implements part of buildStepsGenerator
+func (g gradleGenerator) additionalArtifacts() []string {
+	return []string{path.Join(outputDirectory, "javac-extractor.err")}
 }

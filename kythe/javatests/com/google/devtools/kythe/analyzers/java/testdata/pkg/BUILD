@@ -42,6 +42,14 @@ java_verifier_test(
 )
 
 java_verifier_test(
+    name = "annotation_comments_tests",
+    size = "small",
+    srcs = ["AnnotationComments.java"],
+    # TODO(#3459): make this failing test not manual if bug is fixed
+    tags = ["manual"],
+)
+
+java_verifier_test(
     name = "callgraph_tests",
     size = "small",
     srcs = ["Callgraph.java"],
@@ -155,7 +163,7 @@ java_verifier_test(
     deps = [":jvm_files_tests"],
 )
 
-# TODO This test currently fails: https://phabricator-dot-kythe-repo.appspot.com/T185
+# TODO(#1501): This test currently fails
 java_verifier_test(
     name = "generic_class_tests",
     size = "small",
@@ -178,7 +186,7 @@ java_verifier_test(
     srcs = ["GenericMethod.java"],
 )
 
-# TODO This test currently fails: https://phabricator-dot-kythe-repo.appspot.com/T185
+# TODO(#1501): This test currently fails
 java_verifier_test(
     name = "generic_method_ref_tests",
     size = "small",

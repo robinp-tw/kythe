@@ -5,6 +5,8 @@ load("@build_bazel_rules_nodejs//:package.bzl", "rules_nodejs_dependencies")
 load("@io_bazel_rules_go//go:def.bzl", "go_register_toolchains", "go_rules_dependencies")
 load("@io_kythe//:setup.bzl", "maybe")
 load("@io_kythe//tools:build_rules/shims.bzl", "go_repository")
+load("@io_kythe//tools/build_rules/llvm:repo.bzl", "git_llvm_repository")
+load("@io_kythe//third_party/leiningen:lein_repo.bzl", "lein_repository")
 
 def _rule_dependencies():
     gazelle_dependencies()
@@ -159,6 +161,11 @@ def _cc_dependencies():
         url = "https://github.com/google/leveldb/archive/v1.20.zip",
     )
 
+    maybe(
+        git_llvm_repository,
+        name = "org_llvm",
+    )
+
 def _java_dependencies():
     maybe(
         # For @com_google_common_flogger
@@ -284,11 +291,11 @@ def _go_dependencies():
         go_repository,
         name = "com_github_golang_protobuf",
         build_file_proto_mode = "disable_global",
-        commit = "aa810b61a9c79d51363740d207bb46cf8e620ed5",
         custom = "protobuf",
         importpath = "github.com/golang/protobuf",
         patch_args = ["-p1"],
         patches = ["@io_bazel_rules_go//third_party:com_github_golang_protobuf-extras.patch"],
+        tag = "v1.2.0",
     )
 
     maybe(
@@ -310,9 +317,9 @@ def _go_dependencies():
     maybe(
         go_repository,
         name = "com_github_google_go_cmp",
-        commit = "5411ab924f9ffa6566244a9e504bc347edacffd3",
         custom = "cmp",
         importpath = "github.com/google/go-cmp",
+        tag = "v0.2.0",
     )
 
     maybe(
@@ -359,15 +366,15 @@ def _go_dependencies():
     maybe(
         go_repository,
         name = "com_github_google_subcommands",
-        commit = "a3682377147edf596d303faabd89f81977b3f678",
         custom = "subcommands",
         importpath = "github.com/google/subcommands",
+        tag = "1.0.1",
     )
 
     maybe(
         go_repository,
         name = "org_golang_x_tools",
-        commit = "3e7aa9e59977626dc60433e9aeadf1bb63d28295",
+        commit = "4892ae6946ab8a542e4fe1bf1376eb714b9e7aec",
         custom = "x_tools",
         custom_git = "https://github.com/golang/tools.git",
         importpath = "golang.org/x/tools",
@@ -378,16 +385,16 @@ def _go_dependencies():
     maybe(
         go_repository,
         name = "org_golang_x_text",
-        commit = "7922cc490dd5a7dbaa7fd5d6196b49db59ac042f",
         custom = "x_text",
         custom_git = "https://github.com/golang/text.git",
         importpath = "golang.org/x/text",
+        tag = "v0.3.0",
     )
 
     maybe(
         go_repository,
         name = "org_golang_x_net",
-        commit = "f73e4c9ed3b7ebdd5f699a16a880c2b1994e50dd",
+        commit = "d26f9f9a57f3fab6a695bec0d84433c2c50f8bbf",
         custom = "x_net",
         custom_git = "https://github.com/golang/net.git",
         importpath = "golang.org/x/net",
@@ -396,50 +403,42 @@ def _go_dependencies():
     maybe(
         go_repository,
         name = "com_github_pkg_errors",
-        commit = "816c9085562cd7ee03e7f8188a1cfd942858cded",
         custom = "errors",
         importpath = "github.com/pkg/errors",
+        tag = "v0.8.1",
     )
 
     maybe(
         go_repository,
         name = "org_bitbucket_creachadair_stringset",
-        commit = "e974a3c1694da0d5a14216ce46dbceef6a680978",
         custom = "stringset",
         custom_git = "https://bitbucket.org/creachadair/stringset.git",
         importpath = "bitbucket.org/creachadair/stringset",
+        tag = "v0.0.3",
     )
 
     maybe(
         go_repository,
         name = "org_bitbucket_creachadair_shell",
-        commit = "3dcd505a7ca5845388111724cc2e094581e92cc6",
         custom = "shell",
         custom_git = "https://bitbucket.org/creachadair/shell.git",
         importpath = "bitbucket.org/creachadair/shell",
-    )
-
-    maybe(
-        go_repository,
-        name = "com_github_google_go_github",
-        commit = "8ea2e2657df890db8fb434a9274799d641bd698c",
-        custom = "github",
-        importpath = "github.com/google/go-github",
+        tag = "v0.0.4",
     )
 
     maybe(
         go_repository,
         name = "org_golang_google_grpc",
-        commit = "d07538b1475ec5b0ac85319e4a6706b2d2d8cab7",
         custom = "grpc",
         custom_git = "https://github.com/grpc/grpc-go.git",
         importpath = "google.golang.org/grpc",
+        tag = "v1.16.0",
     )
 
     maybe(
         go_repository,
         name = "org_golang_x_oauth2",
-        commit = "cdc340f7c179dbbfa4afd43b7614e8fcadde4269",
+        commit = "d2e6202438beef2727060aa7cabdd924d92ebfd9",
         custom = "x_oauth2",
         custom_git = "https://github.com/golang/oauth2.git",
         importpath = "golang.org/x/oauth2",
@@ -448,18 +447,27 @@ def _go_dependencies():
     maybe(
         go_repository,
         name = "com_github_google_go_querystring",
-        commit = "53e6ce116135b80d037921a7fdd5138cf32d7a8a",
         custom = "querystring",
         importpath = "github.com/google/go-querystring",
+        tag = "v1.0.0",
     )
 
     maybe(
         go_repository,
         name = "com_github_apache_beam",
         build_file_proto_mode = "disable",
-        commit = "f1a46474e4c13cab82322cda86f1793e56bea31d",
+        commit = "d0cb12b5af8bc54c5b8e68107d642886c996b3da",
         custom = "beam",
         importpath = "github.com/apache/beam",
+    )
+
+    maybe(
+        go_repository,
+        name = "com_github_googleapis_gax_go",
+        build_file_proto_mode = "disable",
+        commit = "ddfab93c3faef4935403ac75a7c11f0e731dc181",
+        custom = "googleapis_gax",
+        importpath = "github.com/googleapis/gax-go",
     )
 
     maybe(
@@ -474,19 +482,19 @@ def _go_dependencies():
     maybe(
         go_repository,
         name = "com_google_cloud_go",
-        commit = "01301d1df8060594708d76bda9062b0205b77e8b",
         custom = "google_cloud",
         custom_git = "https://github.com/GoogleCloudPlatform/google-cloud-go.git",
         importpath = "cloud.google.com/go",
+        tag = "v0.26.0",
     )
 
     maybe(
         go_repository,
         name = "io_opencensus_go",
-        commit = "c40611a83b49d279ee5203c85e4fe169dcb158b6",
         custom = "opencensus",
         custom_git = "https://github.com/census-instrumentation/opencensus-go.git",
         importpath = "go.opencensus.io",
+        tag = "v0.15.0",
     )
 
     maybe(
@@ -507,7 +515,7 @@ def _go_dependencies():
     maybe(
         go_repository,
         name = "org_golang_x_sys",
-        commit = "6c888cc515d3ed83fc103cf1d84468aad274b0a7",
+        commit = "49385e6e15226593f68b26af201feec29d5bba22",
         custom = "x_sys",
         custom_git = "https://github.com/golang/sys.git",
         importpath = "golang.org/x/sys",
@@ -516,17 +524,17 @@ def _go_dependencies():
     maybe(
         go_repository,
         name = "com_github_datadog_zstd",
-        commit = "aebefd9fcb99f22cd691ef778a12ed68f0e6a1ab",
         custom = "zstd",
         importpath = "github.com/DataDog/zstd",
+        tag = "v1.3.5",
     )
 
     maybe(
         go_repository,
         name = "com_github_beevik_etree",
-        commit = "9d7e8feddccb4ed1b8afb54e368bd323d2ff652c",
         custom = "etree",
         importpath = "github.com/beevik/etree",
+        tag = "v1.1.0",
     )
 
     maybe(
@@ -547,17 +555,17 @@ def _go_dependencies():
     maybe(
         go_repository,
         name = "in_gopkg_yaml_v2",
-        commit = "4fc5987536ef307a24ca299aee7ae301cde3d221",
         custom = "yaml",
         importpath = "gopkg.in/yaml.v2",
+        tag = "v2.2.2",
     )
 
     maybe(
         go_repository,
         name = "com_github_mholt_archiver",
-        commit = "d572b2e8b82726cee9476d1b9d63a7fe9b601ff1",
         custom = "archiver",
         importpath = "github.com/mholt/archiver",
+        tag = "v3.1.1",
     )
 
     maybe(
@@ -571,17 +579,17 @@ def _go_dependencies():
     maybe(
         go_repository,
         name = "com_github_nwaples_rardecode",
-        commit = "197ef08ef68c4454ae5970a9c2692d6056ceb8d7",
         custom = "rardecode",
         importpath = "github.com/nwaples/rardecode",
+        tag = "v1.0.0",
     )
 
     maybe(
         go_repository,
         name = "com_github_pierrec_lz4",
-        commit = "623b5a2f4d2a41e411730dcdfbfdaeb5c0c4564e",
         custom = "lz4",
         importpath = "github.com/pierrec/lz4",
+        tag = "v2.0.8",
     )
 
     maybe(
@@ -648,8 +656,16 @@ def _bindings():
 def _kythe_contributions():
     git_repository(
         name = "io_kythe_lang_proto",
-        commit = "b6f38f05feaeeea1e38ceeeb92bee849926921cd",
+        commit = "e9b68f1708ebeb4c11e0a7ff155ab0a5480d3a35",
         remote = "https://github.com/kythe/lang-proto",
+    )
+
+def _sample_ui_dependencies():
+    """Defines external repositories necessary for building the sample UI."""
+    lein_repository(
+        name = "org_leiningen",
+        sha256 = "af77a8569238fb89272fdd46974c97383be126f19e709f1e7b1c5ffb9135e1d7",
+        version = "2.5.1",
     )
 
 def kythe_dependencies():
@@ -683,4 +699,5 @@ def kythe_dependencies():
     )
 
     _rule_dependencies()
+    _sample_ui_dependencies()
     _bindings()
