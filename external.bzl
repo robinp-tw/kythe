@@ -2,7 +2,7 @@ load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@build_bazel_rules_nodejs//:package.bzl", "rules_nodejs_dependencies")
-load("@io_bazel_rules_go//go:def.bzl", "go_register_toolchains", "go_rules_dependencies")
+load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 load("@io_kythe//:setup.bzl", "maybe")
 load("@io_kythe//tools:build_rules/shims.bzl", "go_repository")
 load("@io_kythe//tools/build_rules/llvm:repo.bzl", "git_llvm_repository")
@@ -129,9 +129,9 @@ def _cc_dependencies():
     maybe(
         http_archive,
         name = "com_googlesource_code_re2",
-        # Gitiles creates gzip files with an embedded timestamp, so we cannot use
-        # sha256 to validate the archives.  We must rely on the commit hash and https.
-        url = "https://code.googlesource.com/re2/+archive/2c220e7df3c10d42d74cb66290ec89116bb5e6be.tar.gz",
+        sha256 = "ae9b962dbd6427565efd3e9503acb40a1385b21962c29050546c9347ac7fa93f",
+        strip_prefix = "re2-2019-01-01",
+        url = "https://github.com/google/re2/archive/2019-01-01.zip",
     )
 
     maybe(
@@ -300,10 +300,10 @@ def _go_dependencies():
 
     maybe(
         go_repository,
-        name = "com_github_pborman_uuid",
-        commit = "c65b2f87fee37d1c7854c9164a450713c28d50cd",
+        name = "com_github_google_uuid",
         custom = "uuid",
-        importpath = "github.com/pborman/uuid",
+        importpath = "github.com/google/uuid",
+        tag = "v1.1.0",
     )
 
     maybe(
@@ -341,10 +341,18 @@ def _go_dependencies():
 
     maybe(
         go_repository,
+        name = "com_github_hanwen_go_fuse",
+        commit = "dfd0ceb206ca58277d145a4bc3a5e054b3ac20d1",
+        custom = "go_fuse",
+        importpath = "github.com/hanwen/go-fuse",
+    )
+
+    maybe(
+        go_repository,
         name = "com_github_golang_snappy",
-        commit = "553a641470496b2327abcac10b36396bd98e45c9",
         custom = "snappy",
         importpath = "github.com/golang/snappy",
+        tag = "v0.0.1",
     )
 
     maybe(
@@ -456,7 +464,7 @@ def _go_dependencies():
         go_repository,
         name = "com_github_apache_beam",
         build_file_proto_mode = "disable",
-        commit = "d0cb12b5af8bc54c5b8e68107d642886c996b3da",
+        commit = "2a41235289152d84e4283c2efd7812896150c183",
         custom = "beam",
         importpath = "github.com/apache/beam",
     )
@@ -540,8 +548,8 @@ def _go_dependencies():
     maybe(
         go_repository,
         name = "com_github_google_orderedcode",
-        commit = "05a79567b685231e7ca5db3adccddf9ae9dd86df",
         importpath = "github.com/google/orderedcode",
+        tag = "v0.0.1",
     )
 
     maybe(

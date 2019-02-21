@@ -19,25 +19,26 @@ steps:
   id: 'JAVA-ARTIFACTS'
   waitFor: ['-']
 - name: 'gcr.io/kythe-public/build-preprocessor'
-  args: ['/workspace/code/android/pom.xml']
+  args: ['/workspace/code/pom.xml']
   id: 'PREPROCESS0'
   waitFor:
     - 'CHECKOUT'
-- name: 'gcr.io/cloud-builders/mvn'
+- name: 'maven:3.6.0-jdk-8-slim'
+  entrypoint: 'mvn'
   args:
     - 'clean'
     - 'compile'
     - 'test-compile'
     - '-X'
     - '-f'
-    - '/workspace/code/android/pom.xml'
+    - '/workspace/code/pom.xml'
     - '-Dmaven.compiler.forceJavacCompilerUse=true'
     - '-Dmaven.compiler.fork=true'
     - '-Dmaven.compiler.executable=/opt/kythe/extractors/javac-wrapper.sh'
   env:
-    - 'KYTHE_CORPUS=guava-android'
+    - 'KYTHE_CORPUS=guava'
     - 'KYTHE_OUTPUT_DIRECTORY=/workspace/out'
-    - 'KYTHE_ROOT_DIRECTORY=/workspace/code/android'
+    - 'KYTHE_ROOT_DIRECTORY=/workspace/code'
     - 'JAVAC_EXTRACTOR_JAR=/opt/kythe/extractors/javac_extractor.jar'
     - 'REAL_JAVAC=/usr/bin/javac'
     - 'TMPDIR=/workspace/out'
@@ -51,11 +52,11 @@ steps:
     - 'PREPROCESS0'
 - name: 'gcr.io/kythe-public/kzip-tools'
   entrypoint: 'bash'
-  args: ['-c', '/opt/kythe/tools/kzip merge --output /workspace/out/guava-android-${_VERSION}.kzip /workspace/out/*.kzip']
+  args: ['-c', '/opt/kythe/tools/kzip merge --output /workspace/out/guava-${_VERSION}.kzip /workspace/out/*.kzip']
 artifacts:
   objects:
     location: 'gs://${_OUTPUT_GS_BUCKET}/'
     paths:
       - '/workspace/out/javac-extractor.err'
-      - '/workspace/out/guava-android-${_VERSION}.kzip'
+      - '/workspace/out/guava-${_VERSION}.kzip'
 

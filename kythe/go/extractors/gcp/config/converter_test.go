@@ -27,7 +27,7 @@ import (
 const testDataDir = "testdata"
 
 // Also test some yaml configs checked in elsewhere.
-const examplesDir = "../examples"
+const examplesDir = "../../../../extractors/gcp/examples"
 
 func TestYAMLConversion(t *testing.T) {
 	testcases := []testcase{
@@ -72,6 +72,12 @@ func TestYAMLConversion(t *testing.T) {
 			jsonFile: "gradle-subdir.json",
 			yamlDir:  testDataDir,
 			yamlFile: "gradle-subdir.yaml",
+		},
+		{
+			name:     "gradle-from-examples",
+			jsonFile: "gradle.json",
+			yamlDir:  examplesDir,
+			yamlFile: "gradle.yaml",
 		},
 	}
 
