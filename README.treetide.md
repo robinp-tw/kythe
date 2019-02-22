@@ -1,20 +1,21 @@
 # Locally added files
 
 shell.nix:
-    Nix env needed to build kythe with bazel.
+    Nix env needed to build kythe with Bazel.
+    By default pinned to a version which was tested.
+
+wrapup.nix:
+    Wrap Kythe binaries (once built with Bazel) into a derivation that can
+    be nix-copy-closure'd to remote machines.
 
 cp-bin.sh:
-    Puts build artifacts to a local dir.
-    Note: those link to random libs in the current nix-shell, which can be
-          GC'd away. So this is not a great option, should write a proper
-          derivation instead (TODO).
+    Puts build artifacts to a local dir. See warts described at the top of
+    wrapup.nix.
 
 # Notes
 
 To compile Kythe:
   - in 'nix-shell' (uses shell.nix)
-      - on first checkout, execute 'tools/modules/update.sh'
-
       - bazel build kythe/release
         - use 'bazel build -s' if anything goes wrong to see invocation details
 
@@ -23,6 +24,7 @@ To compile Kythe:
         - if still, then wipe ~/.cache/bazel and retry.
         - note: this often happens when entering the nix-shell again, with old
           cached nix artifacts getting stale.
+        - could as well just rebuild the toolchain.
 
       - bazel build kythe/cxx/extractor/...
         - BUG? why isn't libncursesw.so.6 picked up? even added ncurses.dev to nix-shell packages. It seems to be in NIX_LDPATH.
@@ -33,12 +35,4 @@ To compile Kythe:
         - But this was buggy, env was lost in various ways (sometimes not
           propagated to host config, or through certain rules). Obsoleted
           by custom .bazelrc.
-
-To crossref Kythe itself (TODO update):
-  - bazel build kythe/go/serving/tools/... --experimental_action_listener kythe/go/extractors/cmd/bazel:extract_kzip_go
-  - find and index the kzips
-      - tree bazel-out/k8-fastbuild/extra_actions/kythe/go/extractors/cmd/bazel/extra_action/kythe/
-      - ./bazel-bin/kythe/go/indexer/cmd/go_indexer/linux_amd64_stripped/go_indexer $(find kythe-kzips -name '*.kzip') | ...write_entries...
-  - the xrefs don't seem to pick up kythe.io prefix, so things are not properly xrefd
-    - AI: maybe open issue
 

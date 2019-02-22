@@ -1,4 +1,4 @@
-{ pkgs ? import <nixpkgs> {} }:
+{ pkgs ? (import ./default.nix).nixpkgs {} }:
 
 with pkgs;
 { kythe-compile = stdenv.mkDerivation {
