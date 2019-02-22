@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strconv"
 
 	rpb "kythe.io/kythe/proto/repo_go_proto"
 
@@ -34,8 +35,8 @@ import (
 // Constants that map input/output substitutions.
 const (
 	defaultCorpus   = "${_CORPUS}"
-	defaultVersion  = "${_VERSION}"
-	outputGsBucket  = "${_OUTPUT_GS_BUCKET}"
+	defaultVersion  = "${_COMMIT}"
+	outputGsBucket  = "${_BUCKET_NAME}"
 	defaultRepoName = "${_REPO}"
 )
 
@@ -92,7 +93,7 @@ func KytheToBuild(conf *rpb.Config) (*cloudbuild.Build, error) {
 	build := &cloudbuild.Build{
 		Artifacts: &cloudbuild.Artifacts{
 			Objects: &cloudbuild.ArtifactObjects{
-				Location: fmt.Sprintf("gs://%s/", outputGsBucket),
+				Location: fmt.Sprintf("gs://%s/%s/", outputGsBucket, hints.Corpus),
 				Paths:    []string{path.Join(outputDirectory, outputFileName(hints.Corpus))},
 			},
 		},
@@ -106,15 +107,23 @@ func KytheToBuild(conf *rpb.Config) (*cloudbuild.Build, error) {
 	if err != nil {
 		return nil, err
 	}
-	build.Artifacts.Objects.Paths = append(g.additionalArtifacts(), build.Artifacts.Objects.Paths...)
+
+	build.Steps = append(build.Steps, g.preExtractSteps()...)
+
 	targets := hints.Targets
 	if len(targets) == 0 {
 		targets = append(targets, g.defaultExtractionTarget())
 	}
 	for i, target := range targets {
-		build.Steps = append(build.Steps, g.extractSteps(hints.Corpus, target, i)...)
+		idSuffix := ""
+		if len(targets) > 1 {
+			idSuffix = strconv.Itoa(i)
+		}
+		build.Steps = append(build.Steps, g.extractSteps(hints.Corpus, target, idSuffix)...)
 	}
+
 	build.Steps = append(build.Steps, g.postExtractSteps(hints.Corpus)...)
+
 	return build, nil
 }
 
@@ -138,10 +147,13 @@ func readConfigFile(input string) (*rpb.Config, error) {
 // need ones that are appended.  We might need build steps that occur before or
 // directly after cloning, but before other common steps.
 type buildSystemElaborator interface {
+	// preExtractSteps is a list of cloudbuild steps to be done before
+	// extraction starts, specific to this extractor type.
+	preExtractSteps() []*cloudbuild.BuildStep
 	// extractSteps is a list of cloudbuild steps to extract the given target.
-	// The buildID is simply a unique integer for this instance and target, for
-	// use in coordinating paralleism if desired.
-	extractSteps(corpus string, target *rpb.ExtractionTarget, buildID int) []*cloudbuild.BuildStep
+	// The idSuffix is simply a unique identifier for this instance and target,
+	// for use in coordinating paralleism if desired.
+	extractSteps(corpus string, target *rpb.ExtractionTarget, idSuffix string) []*cloudbuild.BuildStep
 	// postExtractSteps is a list of cloudbuild steps to be done after
 	// extraction finishes.
 	postExtractSteps(corpus string) []*cloudbuild.BuildStep
@@ -149,9 +161,6 @@ type buildSystemElaborator interface {
 	// configuration file for a repo of a given type.  For example for a bazel
 	// repo it might just be root/BUILD, or a maven repo will have repo/pom.xml.
 	defaultExtractionTarget() *rpb.ExtractionTarget
-	// additionalArtifacts should be prepended to the list of artifacts returned
-	// from the cloudbuild invocation.
-	additionalArtifacts() []string
 }
 
 func generator(b rpb.BuildSystem) (buildSystemElaborator, error) {
@@ -168,5 +177,5 @@ func generator(b rpb.BuildSystem) (buildSystemElaborator, error) {
 }
 
 func outputFileName(corpus string) string {
-	return corpus + "-" + defaultVersion + ".kzip"
+	return defaultVersion + ".kzip"
 }

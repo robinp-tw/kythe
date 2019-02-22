@@ -19,7 +19,6 @@ package config
 import (
 	"path"
 	"path/filepath"
-	"strconv"
 
 	"kythe.io/kythe/go/extractors/constants"
 
@@ -30,13 +29,19 @@ import (
 
 type gradleGenerator struct{}
 
+// preExtractSteps implements parts of buildSystemElaborator
+func (g gradleGenerator) preExtractSteps() []*cloudbuild.BuildStep {
+	return []*cloudbuild.BuildStep{
+		javaExtractorsStep(),
+	}
+}
+
 // extractSteps implements parts of buildSystemElaborator
-func (g gradleGenerator) extractSteps(corpus string, target *rpb.ExtractionTarget, buildID int) []*cloudbuild.BuildStep {
+func (g gradleGenerator) extractSteps(corpus string, target *rpb.ExtractionTarget, idSuffix string) []*cloudbuild.BuildStep {
 	buildfile := path.Join(codeDirectory, target.Path)
 	targetPath, _ := filepath.Split(target.Path)
 	return []*cloudbuild.BuildStep{
-		javaExtractorsStep(),
-		preprocessorStep(buildfile, buildID),
+		preprocessorStep(buildfile, idSuffix),
 		&cloudbuild.BuildStep{
 			Name:       constants.GradleJDK8Image,
 			Entrypoint: "gradle",
@@ -50,9 +55,6 @@ func (g gradleGenerator) extractSteps(corpus string, target *rpb.ExtractionTarge
 				// The alternative here is to fall back to using clean install,
 				// which should also work.
 				"build",
-				"-s", // Prints stacktraces for user exceptions.
-				"-S", // Prints verbose stacktraces.
-				"-d", // Logs in debug mode.
 				"-b", // Points directly at a specific build.gradle file:
 				buildfile,
 			},
@@ -68,11 +70,10 @@ func (g gradleGenerator) extractSteps(corpus string, target *rpb.ExtractionTarge
 				"KYTHE_ROOT_DIRECTORY=" + filepath.Join(codeDirectory, targetPath),
 				"JAVAC_EXTRACTOR_JAR=" + constants.DefaultJavaExtractorLocation,
 				"REAL_JAVAC=" + constants.DefaultJavacLocation,
-				"TMPDIR=" + outputDirectory,
 				"KYTHE_JAVA_RUNTIME_OPTIONS=-Xbootclasspath/p:" + constants.DefaultJava9ToolsLocation,
 			},
-			Id:      extractStepID + strconv.Itoa(buildID),
-			WaitFor: []string{javaArtifactsID, preStepID + strconv.Itoa(buildID)},
+			Id:      extractStepID + idSuffix,
+			WaitFor: []string{javaArtifactsID, preStepID + idSuffix},
 		},
 	}
 }
@@ -89,9 +90,4 @@ func (g gradleGenerator) defaultExtractionTarget() *rpb.ExtractionTarget {
 	return &rpb.ExtractionTarget{
 		Path: "build.gradle",
 	}
-}
-
-// additionalArtifacts implements part of buildStepsGenerator
-func (g gradleGenerator) additionalArtifacts() []string {
-	return []string{path.Join(outputDirectory, "javac-extractor.err")}
 }
