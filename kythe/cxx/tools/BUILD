@@ -44,6 +44,7 @@ cc_library(
         "//kythe/cxx/extractor:index_pack",
         "//kythe/proto:analysis_cc_proto",
         "//kythe/proto:claim_cc_proto",
+        "//kythe/proto:filecontext_cc_proto",
         "@com_github_gflags_gflags//:gflags",
         "@com_github_google_glog//:glog",
         "@com_google_protobuf//:protobuf",

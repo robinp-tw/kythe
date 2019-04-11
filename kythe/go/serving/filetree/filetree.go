@@ -101,10 +101,6 @@ func (t *Table) Directory(ctx context.Context, req *ftpb.DirectoryRequest) (*ftp
 		return nil, err
 	}
 	return &ftpb.DirectoryReply{
-		// TODO(schroederc): remove deprecated fields
-		Subdirectory: d.Subdirectory,
-		File:         d.FileTicket,
-
 		Corpus: req.Corpus,
 		Root:   req.Root,
 		Path:   req.Path,
@@ -145,8 +141,9 @@ func (t *Table) CorpusRoots(ctx context.Context, req *ftpb.CorpusRootsRequest) (
 
 	for i, corpus := range cr.Corpus {
 		reply.Corpus[i] = &ftpb.CorpusRootsReply_Corpus{
-			Name: corpus.Corpus,
-			Root: corpus.Root,
+			Name:        corpus.Corpus,
+			Root:        corpus.Root,
+			BuildConfig: corpus.BuildConfig,
 		}
 	}
 

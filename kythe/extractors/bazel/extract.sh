@@ -43,12 +43,22 @@
 # Also assumes you have extractors installed as per
 # kythe/extractors/bazel/extractors.bazelrc.
 
-${KYTHE_OUTPUT_DIRECTORY:?Missing output directory}
+: ${KYTHE_OUTPUT_DIRECTORY:?Missing output directory}
 
-bazel "$@"
+if [ -n "$KYTHE_SYSTEM_DEPS" ]; then
+  echo "Installing $KYTHE_SYSTEM_DEPS"
+  # TODO(jaysachs): unclear if we should bail if any packages fail to install
+  apt-get update && \
+  apt-get upgrade -y && \
+  apt-get install -y $KYTHE_SYSTEM_DEPS && \
+  apt-get clean
+fi
+
+/kythe/bazelisk --bazelrc=/kythe/bazelrc "$@"
 
 # Collect any extracted compilations.
-mkdir -p $KYTHE_OUTPUT_DIRECTORY
-find bazel-out/*/extra_actions/external/kythe_extractors -name '*.kzip' | \
-  xargs /kythe/kzip merge --output $KYTHE_OUTPUT_DIRECTORY/compilations.kzip
-/kythe/fix_permissions.sh $KYTHE_OUTPUT_DIRECTORY
+mkdir -p "$KYTHE_OUTPUT_DIRECTORY"
+find bazel-out/*/extra_actions/external/kythe_release -name '*.kzip' | \
+  xargs -r /kythe/tools/kzip merge --output "$KYTHE_OUTPUT_DIRECTORY/compilations.kzip"
+/kythe/fix_permissions.sh "$KYTHE_OUTPUT_DIRECTORY"
+test -f "$KYTHE_OUTPUT_DIRECTORY/compilations.kzip"

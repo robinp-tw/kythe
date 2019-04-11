@@ -33,6 +33,7 @@
 #include "kythe/cxx/extractor/cxx_details.h"
 #include "kythe/cxx/extractor/language.h"
 #include "kythe/proto/analysis.pb.h"
+#include "kythe/proto/filecontext.pb.h"
 
 namespace clang {
 class FrontendAction;
@@ -130,7 +131,7 @@ class KzipWriterSink : public CompilationWriterSink {
   explicit KzipWriterSink(const std::string& path, OutputPathType path_type);
   void OpenIndex(const std::string& unit_hash) override;
   void WriteHeader(const kythe::proto::CompilationUnit& header) override;
-  void WriteFileContent(const kythe::proto::FileData& content) override;
+  void WriteFileContent(const kythe::proto::FileData& file) override;
   ~KzipWriterSink() override;
 
  private:

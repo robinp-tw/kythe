@@ -7,6 +7,7 @@ load("@io_kythe//:setup.bzl", "maybe")
 load("@io_kythe//tools:build_rules/shims.bzl", "go_repository")
 load("@io_kythe//tools/build_rules/llvm:repo.bzl", "git_llvm_repository")
 load("@io_kythe//third_party/leiningen:lein_repo.bzl", "lein_repository")
+load("@io_kythe//tools/build_rules/lexyacc:lexyacc.bzl", "lexyacc_configure")
 
 def _rule_dependencies():
     gazelle_dependencies()
@@ -75,9 +76,9 @@ def _cc_dependencies():
     maybe(
         http_archive,
         name = "com_github_gflags_gflags",
-        sha256 = "94ad0467a0de3331de86216cbc05636051be274bf2160f6e86f07345213ba45b",
-        strip_prefix = "gflags-77592648e3f3be87d6c7123eb81cbad75f9aef5a",
-        url = "https://github.com/gflags/gflags/archive/77592648e3f3be87d6c7123eb81cbad75f9aef5a.zip",
+        sha256 = "19713a36c9f32b33df59d1c79b4958434cb005b5b47dc5400a7a4b078111d9b5",
+        strip_prefix = "gflags-2.2.2",
+        url = "https://github.com/gflags/gflags/archive/v2.2.2.zip",
     )
 
     maybe(
@@ -166,6 +167,8 @@ def _cc_dependencies():
         name = "org_llvm",
     )
 
+    lexyacc_configure()
+
 def _java_dependencies():
     maybe(
         # For @com_google_common_flogger
@@ -191,8 +194,8 @@ def _java_dependencies():
     maybe(
         native.maven_jar,
         name = "com_google_guava_guava",
-        artifact = "com.google.guava:guava:25.1-jre",
-        sha1 = "6c57e4b22b44e89e548b5c9f70f0c45fe10fb0b4",
+        artifact = "com.google.guava:guava:26.0-jre",
+        sha1 = "6a806eff209f36f635f943e16d97491f00f6bfab",
     )
 
     maybe(
@@ -309,9 +312,9 @@ def _go_dependencies():
     maybe(
         go_repository,
         name = "com_github_jmhodges_levigo",
-        commit = "c42d9e0ca023e2198120196f842701bb4c55d7b9",
         custom = "levigo",
         importpath = "github.com/jmhodges/levigo",
+        tag = "v1.0.0",
     )
 
     maybe(
@@ -342,9 +345,9 @@ def _go_dependencies():
     maybe(
         go_repository,
         name = "com_github_hanwen_go_fuse",
-        commit = "dfd0ceb206ca58277d145a4bc3a5e054b3ac20d1",
         custom = "go_fuse",
         importpath = "github.com/hanwen/go-fuse",
+        tag = "v1.0.0",
     )
 
     maybe(
@@ -473,9 +476,9 @@ def _go_dependencies():
         go_repository,
         name = "com_github_googleapis_gax_go",
         build_file_proto_mode = "disable",
-        commit = "ddfab93c3faef4935403ac75a7c11f0e731dc181",
         custom = "googleapis_gax",
         importpath = "github.com/googleapis/gax-go",
+        tag = "v1.0.1",
     )
 
     maybe(
@@ -515,9 +518,9 @@ def _go_dependencies():
     maybe(
         go_repository,
         name = "com_github_minio_highwayhash",
-        commit = "85fc8a2dacad36a6beb2865793cd81363a496696",
         custom = "highwayhash",
         importpath = "github.com/minio/highwayhash",
+        tag = "v1.0.0",
     )
 
     maybe(
@@ -579,9 +582,9 @@ def _go_dependencies():
     maybe(
         go_repository,
         name = "com_github_dsnet_compress",
-        commit = "cc9eb1d7ad760af14e8f918698f745e80377af4f",
         custom = "compress",
         importpath = "github.com/dsnet/compress",
+        tag = "v0.0.1",
     )
 
     maybe(
@@ -661,19 +664,27 @@ def _bindings():
         actual = "@net_zlib//:zlib",
     )
 
-def _kythe_contributions():
-    git_repository(
-        name = "io_kythe_lang_proto",
-        commit = "e9b68f1708ebeb4c11e0a7ff155ab0a5480d3a35",
-        remote = "https://github.com/kythe/lang-proto",
+def _extractor_image_dependencies():
+    """Defines external repositories necessary for extractor images."""
+    maybe(
+        http_archive,
+        name = "com_github_philwo_bazelisk",
+        sha256 = "cb6a208f559fd08d205527b69d597ef36f7e1a922fe1df64081e52dd544f7666",
+        strip_prefix = "bazelisk-0.0.2",
+        urls = ["https://github.com/philwo/bazelisk/archive/0.0.2.zip"],
+    )
+    go_repository(
+        name = "com_github_hashicorp_go_version",
+        importpath = "github.com/hashicorp/go-version",
+        tag = "v1.1.0",
     )
 
 def _sample_ui_dependencies():
     """Defines external repositories necessary for building the sample UI."""
     lein_repository(
         name = "org_leiningen",
-        sha256 = "af77a8569238fb89272fdd46974c97383be126f19e709f1e7b1c5ffb9135e1d7",
-        version = "2.5.1",
+        sha256 = "a0a1f093677045c4e1e40219ccc989acd61433f61c50e098a2185faf4f03553c",
+        version = "2.5.3",
     )
 
 def kythe_dependencies():
@@ -684,18 +695,16 @@ def kythe_dependencies():
     _cc_dependencies()
     _go_dependencies()
     _java_dependencies()
-    _kythe_contributions()
 
     # proto_library, cc_proto_library, and java_proto_library rules implicitly
     # depend on @com_google_protobuf for protoc and proto runtimes.
-    #
-    # TODO(schroederc): update to 3.7.0 once released
+    # TODO(justbuchanan): update to the next tagged release when available
     maybe(
         http_archive,
         name = "com_google_protobuf",
-        sha256 = "712715f5ac35637131f0d829ca7e0edaccab6fdeb33ecd3692ff24214ae5032f",
-        strip_prefix = "protobuf-de9e1a04a68af0c8c5f49121ebd7dd1a2fed37af",
-        urls = ["https://github.com/protocolbuffers/protobuf/archive/de9e1a04a68af0c8c5f49121ebd7dd1a2fed37af.zip"],
+        sha256 = "48a01655a0ce6ee5cf22cf182bab285951a4cef7f8a9f84db80ec0f8145546c6",
+        strip_prefix = "protobuf-2d0183ab58706a919f138e6920e33e3b76eb62f6",
+        urls = ["https://github.com/protocolbuffers/protobuf/archive/2d0183ab58706a919f138e6920e33e3b76eb62f6.zip"],
     )
 
     maybe(
@@ -709,3 +718,4 @@ def kythe_dependencies():
     _rule_dependencies()
     _sample_ui_dependencies()
     _bindings()
+    _extractor_image_dependencies()

@@ -40,7 +40,6 @@ Kythe relies on the following external dependencies:
 * jdk >= 8
 * [leiningen](http://leiningen.org/) (used to build `//kythe/web/ui`)
 * libcurl4-openssl-dev
-* libncurses-dev
 * libssl-dev
 * node.js
 * parallel
@@ -61,7 +60,7 @@ apt-get update
 
 apt-get install \
     asciidoc asciidoctor source-highlight graphviz \
-    gcc libssl-dev uuid-dev libncurses-dev libcurl4-openssl-dev flex clang-3.5 bison \
+    gcc libssl-dev uuid-dev libncurses-dev libcurl4-openssl-dev flex clang-3.6 bison \
     openjdk-8-jdk \
     parallel \
     wget

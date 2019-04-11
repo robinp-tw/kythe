@@ -19,7 +19,6 @@ package com.google.devtools.kythe.platform.java;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.google.common.collect.Lists;
-import com.sun.tools.javac.api.JavacTool;
 import java.util.List;
 import junit.framework.TestCase;
 
@@ -28,10 +27,6 @@ public class OptionsTest extends TestCase {
 
   public void testRemoveUnsupportedOptions_depAnn() {
     final String lintOption = "-Xlint:-dep-ann";
-
-    // Ensure that the -Xlint:-dep-ann option does not clobber later arguments since JavacTool
-    // **erroneously** believes the option to take an additional argument.
-    assertThat(JavacTool.create().isSupportedOption(lintOption)).isEqualTo(1);
 
     List<String> rawArgs = Lists.newArrayList(lintOption, "--class-path", "some/class/path");
     assertThat(JavacOptionsUtils.removeUnsupportedOptions(rawArgs))

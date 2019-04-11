@@ -24,6 +24,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 
 	rpb "kythe.io/kythe/proto/repo_go_proto"
 
@@ -42,7 +43,7 @@ const (
 
 // Constants ephemeral to a single kythe cloudbuild run.
 const (
-	outputDirectory = "/workspace/out"
+	outputDirectory = "/workspace/output"
 	codeDirectory   = "/workspace/code"
 	javaVolumeName  = "kythe_extractors"
 )
@@ -94,19 +95,21 @@ func KytheToBuild(conf *rpb.Config) (*cloudbuild.Build, error) {
 		Artifacts: &cloudbuild.Artifacts{
 			Objects: &cloudbuild.ArtifactObjects{
 				Location: fmt.Sprintf("gs://%s/%s/", outputGsBucket, hints.Corpus),
-				Paths:    []string{path.Join(outputDirectory, outputFileName(hints.Corpus))},
+				Paths:    []string{path.Join(outputDirectory, outputFileName())},
 			},
 		},
 		// TODO(danielmoy): this should probably also be a generator, or at least
 		// if there is refactoring work done as described below to make steps
 		// more granular, this will have to hook into that logic.
 		Steps: commonSteps(repo),
+		Tags:  []string{hints.Corpus},
 	}
 
 	g, err := generator(hints.BuildSystem)
 	if err != nil {
 		return nil, err
 	}
+	build.Tags = append(build.Tags, "kythe_extract_"+strings.ToLower(hints.BuildSystem.String()))
 
 	build.Steps = append(build.Steps, g.preExtractSteps()...)
 
@@ -169,13 +172,13 @@ func generator(b rpb.BuildSystem) (buildSystemElaborator, error) {
 		return &mavenGenerator{}, nil
 	case rpb.BuildSystem_GRADLE:
 		return &gradleGenerator{}, nil
-	//case rpb.BuildSystem_BAZEL:
-	//		return bazelSteps
+	case rpb.BuildSystem_BAZEL:
+		return &bazelGenerator{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported build system %s", b)
 	}
 }
 
-func outputFileName(corpus string) string {
+func outputFileName() string {
 	return defaultVersion + ".kzip"
 }

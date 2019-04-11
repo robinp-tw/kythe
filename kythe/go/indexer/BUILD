@@ -8,6 +8,7 @@ go_library(
         "emit.go",
         "facts.go",
         "indexer.go",
+        "markedsource.go",
     ],
     deps = [
         "//kythe/go/extractors/govname",
@@ -195,6 +196,12 @@ go_indexer_test(
     name = "packageinit_test",
     srcs = ["testdata/basic/packageinit.go"],
     import_path = "test/pkginit",
+)
+
+go_indexer_test(
+    name = "types_test",
+    srcs = ["testdata/types.go"],
+    has_marked_source = True,
 )
 
 # load(":testdata/go_indexer_test.bzl", "go_integration_test")
