@@ -4,7 +4,9 @@ cc_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":textproto_schema",
+        "//kythe/cxx/common:file_utils",
         "//kythe/cxx/common:kzip_writer",
+        "//kythe/cxx/common:path_utils",
         "//kythe/cxx/extractor/proto:lib",
         "//kythe/cxx/indexer/proto:search_path",
         "//kythe/proto:analysis_cc_proto",

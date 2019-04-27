@@ -30,7 +30,9 @@
 #include "absl/strings/str_split.h"
 #include "gflags/gflags.h"
 #include "glog/logging.h"
+#include "kythe/cxx/common/file_utils.h"
 #include "kythe/cxx/common/kzip_writer.h"
+#include "kythe/cxx/common/path_utils.h"
 #include "kythe/cxx/extractor/proto/proto_extractor.h"
 #include "kythe/cxx/extractor/textproto/textproto_schema.h"
 #include "kythe/cxx/indexer/proto/search_path.h"
@@ -51,21 +53,6 @@ IndexWriter OpenKzipWriterOrDie(absl::string_view path) {
   auto writer = KzipWriter::Create(path);
   CHECK(writer.ok()) << "Failed to open KzipWriter: " << writer.status();
   return std::move(*writer);
-}
-
-// Loads all data from a file or terminates the process.
-std::string LoadFileOrDie(const std::string& file) {
-  FILE* handle = fopen(file.c_str(), "rb");
-  CHECK(handle != nullptr) << "Couldn't open input file " << file;
-  CHECK_EQ(fseek(handle, 0, SEEK_END), 0) << "Couldn't seek " << file;
-  long size = ftell(handle);
-  CHECK_GE(size, 0) << "Bad size for " << file;
-  CHECK_EQ(fseek(handle, 0, SEEK_SET), 0) << "Couldn't seek " << file;
-  std::string content;
-  content.resize(size);
-  CHECK_EQ(fread(&content[0], size, 1, handle), 1) << "Couldn't read " << file;
-  CHECK_NE(fclose(handle), EOF) << "Couldn't close " << file;
-  return content;
 }
 
 }  // namespace
@@ -106,7 +93,7 @@ Examples:
   CHECK(textproto_args.size() == 1)
       << "Expected 1 textproto file, got " << textproto_args.size();
   std::string textproto_filename = textproto_args[0];
-  const std::string textproto = LoadFileOrDie(textproto_filename);
+  const std::string textproto = ::kythe::LoadFileOrDie(textproto_filename);
 
   const char* output_file = getenv("KYTHE_OUTPUT_FILE");
   CHECK(output_file != nullptr)
@@ -144,9 +131,13 @@ Examples:
   *compilation.mutable_unit() =
       proto_extractor.ExtractProtos(proto_filenames, &kzip_writer);
 
+  // Relativize path before writing to kzip.
+  const std::string textproto_rel_filename =
+      RelativizePath(textproto_filename, proto_extractor.root_directory);
+
   // Replace the proto extractor's source file list with our textproto.
   compilation.mutable_unit()->clear_source_file();
-  compilation.mutable_unit()->add_source_file(textproto_filename);
+  compilation.mutable_unit()->add_source_file(textproto_rel_filename);
 
   // Re-build compilation unit's arguments list. Add --proto_message and any
   // protoc args.
@@ -171,12 +162,12 @@ Examples:
     proto::CompilationUnit::FileInput* file_input =
         compilation.mutable_unit()->add_required_input();
     proto::VName vname =
-        proto_extractor.vname_gen.LookupVName(textproto_filename);
+        proto_extractor.vname_gen.LookupVName(textproto_rel_filename);
     if (vname.corpus().empty()) {
       vname.set_corpus(proto_extractor.corpus);
     }
     *file_input->mutable_v_name() = std::move(vname);
-    file_input->mutable_info()->set_path(textproto_filename);
+    file_input->mutable_info()->set_path(textproto_rel_filename);
     file_input->mutable_info()->set_digest(*digest);
   }
 
