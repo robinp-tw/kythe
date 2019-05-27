@@ -17,6 +17,7 @@
 #include "KytheVFS.h"
 
 #include "absl/memory/memory.h"
+#include "absl/strings/str_format.h"
 #include "kythe/cxx/indexer/cxx/proto_conversions.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/FileSystem.h"
@@ -46,6 +47,8 @@ IndexVFS::IndexVFS(const std::string& working_directory,
   for (llvm::StringRef dir : virtual_dirs) {
     FileRecordForPath(dir, BehaviorOnMissing::kCreateDirectory, 0);
   }
+  // Clang always expects to be able to find a directory at .
+  FileRecordForPath(".", BehaviorOnMissing::kCreateDirectory, 0);
 }
 
 IndexVFS::~IndexVFS() {
@@ -252,9 +255,12 @@ IndexVFS::FileRecord* IndexVFS::AllocOrReturnFileRecord(
     if (record->label == label) {
       if (create_if_missing && (record->status.getSize() != size ||
                                 record->status.getType() != type)) {
-        fprintf(stderr, "Warning: path %s/%s: defined inconsistently (%s/%s)\n",
-                parent->status.getName().str().c_str(), label.str().c_str(),
-                NameOfFileType(type), NameOfFileType(record->status.getType()));
+        absl::FPrintF(
+            stderr,
+            "Warning: path %s/%s: defined inconsistently (%s:%d/%s:%d)\n",
+            parent->status.getName().str(), label.str(), NameOfFileType(type),
+            size, NameOfFileType(record->status.getType()),
+            record->status.getSize());
         return nullptr;
       }
       return record;

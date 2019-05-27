@@ -60,9 +60,9 @@ def _cc_dependencies():
     maybe(
         http_archive,
         name = "com_google_absl",
-        sha256 = "77a39b7084b66582aaa18b42e4e4154df6bee29632875bbcc41d99502f784634",
-        strip_prefix = "abseil-cpp-2019e17a520575ab365b2b5134d71068182c70b8",
-        url = "https://github.com/abseil/abseil-cpp/archive/2019e17a520575ab365b2b5134d71068182c70b8.zip",
+        sha256 = "3601822b4d3c7cc62d891a2d0993b902ad1858e4faf41d895678d3a7749ec503",
+        strip_prefix = "abseil-cpp-ca3f87560a0eef716195cadf66dc6b938a579ec6",
+        url = "https://github.com/abseil/abseil-cpp/archive/ca3f87560a0eef716195cadf66dc6b938a579ec6.zip",
     )
 
     maybe(
@@ -243,8 +243,8 @@ def _java_dependencies():
     maybe(
         native.maven_jar,
         name = "com_google_truth_truth",
-        artifact = "com.google.truth:truth:0.41",
-        sha1 = "846cd094934911f635ba2dadc016d538b8c30927",
+        artifact = "com.google.truth:truth:0.44",
+        sha1 = "11eff954c0c14da7d43276d7b3bcf71463105368",
     )
 
     maybe(
@@ -687,7 +687,7 @@ def _sample_ui_dependencies():
         version = "2.5.3",
     )
 
-def kythe_dependencies():
+def kythe_dependencies(sample_ui = True):
     """Defines external repositories for Kythe dependencies.
 
     Call this once in your WORKSPACE file to load all @io_kythe dependencies.
@@ -716,6 +716,7 @@ def kythe_dependencies():
     )
 
     _rule_dependencies()
-    _sample_ui_dependencies()
+    if sample_ui:
+        _sample_ui_dependencies()
     _bindings()
     _extractor_image_dependencies()
