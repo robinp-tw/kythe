@@ -42,7 +42,10 @@
 with pkgs;
 stdenv.mkDerivation {
   name = "wrapped";
-  src = ./bazel-bin;
+  # Note: src must point below the 'bazel-bin' symlink, since symlinks are
+  # stored into nix-store in some weird way, and change under them is not
+  # noticed upon rebuilds.
+  src = ./bazel-bin/kythe;
   buildInputs = [
     libuuid
     ncurses
@@ -50,14 +53,14 @@ stdenv.mkDerivation {
   installPhase = ''
     OUT=$out/bin
     mkdir -p $OUT
-    for tool in kythe/go/serving/tools/write_tables/write_tables \
-      kythe/go/serving/tools/http_server/http_server \
-      kythe/go/storage/tools/write_entries/write_entries \
-      kythe/go/platform/tools/entrystream/entrystream \
-      kythe/cxx/extractor/cxx_extractor \
-      kythe/cxx/indexer/cxx/indexer
+    for tool in go/serving/tools/write_tables/write_tables \
+      go/serving/tools/http_server/http_server \
+      go/storage/tools/write_entries/write_entries \
+      go/platform/tools/entrystream/entrystream \
+      cxx/extractor/cxx_extractor \
+      cxx/indexer/cxx/indexer
     do
-      TARGET_DIR=$OUT/$(dirname $tool)
+      TARGET_DIR=$OUT/kythe/$(dirname $tool)
       mkdir -p $TARGET_DIR
       cp $src/$tool $TARGET_DIR/
     done
