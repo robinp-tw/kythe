@@ -136,9 +136,9 @@ go_extract = rule(
         ),
         # NOTE(treetide): local addition
         "_coreutils": attr.label(
-            # Picking arbitrary executable in bin, will use to get
+            # This will pick an arbitrary executable in bin, will use to get
             # relative ref to others.
-            default = Label("@coreutils//:bin/yes"),
+            default = Label("@coreutils//:bin"),
             cfg = "host",
         ),
         "_sdk_files": attr.label(
