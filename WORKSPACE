@@ -22,11 +22,11 @@ load("@io_tweag_rules_nixpkgs//nixpkgs:nixpkgs.bzl", "nixpkgs_package", "nixpkgs
 
 nixpkgs_git_repository(
   name = "nixpkgs",
-  revision = "def5124ec8367efdba95a99523dd06d918cb0ae8",
+  revision = "e19054ab3cd5b7cc9a01d0efc71c8fe310541065",
 )
 
 nixpkgs_package(
-  name = "bison",
+  name = "coreutils",
   repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
 )
 
@@ -36,9 +36,30 @@ nixpkgs_package(
 )
 
 nixpkgs_package(
+  name = "yacc",
+  repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
+)
+
+nixpkgs_package(
+  name = "bison",
+  repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
+)
+
+#
+# NOTE(treetide): local nix mod to vendor the GO sdk.
+#
+nixpkgs_package(
+  name = "wrapped_go_sdk",
+  repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
+  nix_file = "//:go_sdk.nix",
+  attribute_path = "wrapped_go_sdk",
+)
+
+nixpkgs_package(
   name = "gzip",
   repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
 )
+
 
 nixpkgs_package(
   name = "wget",
@@ -84,7 +105,19 @@ http_archive(
 
 load("//:setup.bzl", "kythe_rule_repositories", "maybe")
 
+# NOTE(treetide): local modification, we hardwired the nix-based values here.
+register_toolchains("//tools/build_rules/lexyacc:lexyacc_local_toolchain")
+
 kythe_rule_repositories()
+
+# NOTE(treetide): local
+load(
+    "@io_bazel_rules_go//go:deps.bzl",
+    "go_wrap_sdk")
+go_wrap_sdk(
+    "go_sdk",
+    root_file = "@wrapped_go_sdk//:share/go/iamhere",
+)
 
 # TODO(schroederc): remove this.  This needs to be loaded before loading the
 # go_* rules.  Normally, this is done by go_rules_dependencies in external.bzl,
@@ -107,7 +140,31 @@ load("//tools/build_rules/external_tools:external_tools_configure.bzl", "externa
 
 external_tools_configure()
 
-load("@build_bazel_rules_nodejs//:index.bzl", "npm_install")
+load("@build_bazel_rules_nodejs//:index.bzl", "npm_install", "node_repositories")
+
+#
+# NOTE(treetide): local nix mod to vendor nodejs.
+#
+nixpkgs_package(
+  name = "my_nodejs",
+  repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
+  nix_file = "//:nodejs.nix",
+  attribute_path = "wrapped_node",
+  build_file_content = """
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "top",
+    srcs = glob(["**/*"]),
+)
+  """,
+)
+
+node_repositories(
+    package_json = ["//:package.json"],
+    node_version = "10.16.0",  # check if you update pinning
+    vendored_node = "@my_nodejs//:top",
+)
 
 npm_install(
     name = "npm",

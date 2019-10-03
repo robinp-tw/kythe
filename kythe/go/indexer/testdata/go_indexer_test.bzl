@@ -31,24 +31,27 @@ load(
 # Emit a shell script that sets up the environment needed by the extractor to
 # capture dependencies and runs the extractor.
 def _emit_extractor_script(ctx, mode, script, output, srcs, deps, ipath, data):
+    coreutilsDir = ctx.files._coreutils[-1].dirname
+    mkdirProg = coreutilsDir + "/mkdir"
+    lnProg = coreutilsDir + "/ln"
     tmpdir = output.dirname + "/tmp"
     srcdir = tmpdir + "/src/" + ipath
     pkgdir = tmpdir + "/pkg/%s_%s" % (mode.goos, mode.goarch)
     extras = []
-    cmds = ["#!/bin/sh -e", "mkdir -p " + pkgdir, "mkdir -p " + srcdir]
+    cmds = ["#!/usr/bin/env -S bash -e", mkdirProg + " -p " + pkgdir, mkdirProg + " -p " + srcdir]
 
     # Link the source files and dependencies into a common temporary directory.
     # Source files need to be made relative to the temp directory.
     ups = srcdir.count("/") + 1
     cmds += [
-        'ln -s "%s%s" "%s"' % ("../" * ups, src.path, srcdir)
+        lnProg + ' -s "%s%s" "%s"' % ("../" * ups, src.path, srcdir)
         for src in srcs
     ]
     for path, dpath in deps.items():
         fullpath = "/".join([pkgdir, dpath])
         tups = fullpath.count("/")
         cmds += [
-            "mkdir -p " + fullpath.rsplit("/", 1)[0],
+            mkdirProg + " -p " + fullpath.rsplit("/", 1)[0],
             "ln -s '%s%s' '%s.a'" % ("../" * tups, path, fullpath),
         ]
 
@@ -102,7 +105,7 @@ def _go_extract(ctx):
     for target in data:
         extras += target.files.to_list()
 
-    tools = ctx.files._extractor + ctx.files._sdk_files
+    tools = ctx.files._extractor + ctx.files._sdk_files + ctx.files._coreutils
     ctx.actions.run(
         mnemonic = "GoExtract",
         executable = script,
@@ -129,6 +132,13 @@ go_extract = rule(
         "_extractor": attr.label(
             default = Label("//kythe/go/extractors/cmd/gotool"),
             executable = True,
+            cfg = "host",
+        ),
+        # NOTE(treetide): local addition
+        "_coreutils": attr.label(
+            # Picking arbitrary executable in bin, will use to get
+            # relative ref to others.
+            default = Label("@coreutils//:bin/yes"),
             cfg = "host",
         ),
         "_sdk_files": attr.label(

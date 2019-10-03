@@ -179,7 +179,11 @@ def _cc_dependencies():
         name = "org_llvm",
     )
 
-    lexyacc_configure()
+    # NOTE(treetide): local change, the lexyacc_toolchain in
+    # tools/build_rules/lexyacc/BUILD was set up to configure from nixpkgs
+    # already.
+    #
+    #lexyacc_configure()
     cxx_extractor_register_toolchains()
 
 def _java_dependencies():

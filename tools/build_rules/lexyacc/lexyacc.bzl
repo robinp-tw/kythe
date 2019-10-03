@@ -1,4 +1,4 @@
-def genlex(name, src, out, includes = []):
+def genlex(name, src, out, includes = [], lex = None):
     """Generate a C++ lexer from a lex file using Flex.
 
     Args:
@@ -8,15 +8,19 @@ def genlex(name, src, out, includes = []):
       includes: A list of headers included by the .lex file.
     """
     cmd = "$(LEX) -o $(@D)/%s $(location %s)" % (out, src)
+    if lex != None:
+      cmd = "$(location %s) -o $(@D)/%s $(location %s)" % (lex, out, src)
     native.genrule(
         name = name,
         outs = [out],
         srcs = [src] + includes,
         cmd = cmd,
+        tools = lex and [lex] or [],
         toolchains = ["@io_kythe//tools/build_rules/lexyacc:current_lexyacc_toolchain"],
     )
 
-def genyacc(name, src, header_out, source_out, extra_outs = []):
+def genyacc(name, src, header_out, source_out, extra_outs = [],
+            yacc = None):
     """Generate a C++ parser from a Yacc file using Bison.
 
     Args:
@@ -27,11 +31,14 @@ def genyacc(name, src, header_out, source_out, extra_outs = []):
       extra_outs: Additional generated outputs.
     """
     cmd = "$(YACC) -o $(@D)/%s $(location %s)" % (source_out, src)
+    if yacc != None:
+      cmd = "$(location %s) -o $(@D)/%s $(location %s)" % (yacc, source_out, src)
     native.genrule(
         name = name,
         outs = [source_out, header_out] + extra_outs,
         srcs = [src],
         cmd = cmd,
+        tools = yacc and [yacc] or [],
         toolchains = ["@io_kythe//tools/build_rules/lexyacc:current_lexyacc_toolchain"],
     )
 

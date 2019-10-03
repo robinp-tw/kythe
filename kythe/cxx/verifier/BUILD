@@ -13,6 +13,7 @@ genyacc(
     ],
     header_out = "parser.yy.hh",
     source_out = "parser.yy.cc",
+    yacc = "@yacc//:bin/yacc",
 )
 
 genlex(
@@ -20,6 +21,7 @@ genlex(
     src = "assertions.lex",
     out = "lexer.yy.cc",
     includes = [":parser"],
+    lex = "@flex//:bin/flex",
 )
 
 cc_library(
