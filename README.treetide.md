@@ -31,8 +31,3 @@ To compile Kythe:
           - See https://github.com/NixOS/nixpkgs/issues/54112.
           - Changed to link against -lncurses for now.
 
-      - was using invoke-build.sh so it adds NIX_* env vars to --action_env
-        - But this was buggy, env was lost in various ways (sometimes not
-          propagated to host config, or through certain rules). Obsoleted
-          by custom .bazelrc.
-
