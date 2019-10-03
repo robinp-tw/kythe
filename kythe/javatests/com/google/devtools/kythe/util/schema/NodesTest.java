@@ -1,3 +1,19 @@
+/*
+ * Copyright 2019 The Kythe Authors. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.google.devtools.kythe.util.schema;
 
 import static com.google.common.truth.Truth.assertThat;
@@ -136,6 +152,45 @@ public final class NodesTest extends TestCase {
                 + " edge_groups: {key: '/kythe/edge/param' value: {"
                 + "  edges: {ticket: 'kythe:#tgt'}"
                 + "  edges: {ticket: 'kythe:#tgt2' ordinal: 1}}}"));
+  }
+
+  public void testFromSource() {
+    testProtoConversion(
+        "fromSource",
+        Nodes::fromSource,
+        Source.class,
+        Node.class,
+        ImmutableList.of(
+            "ticket: 'kythe://c#s'",
+            "ticket: 'kythe:#node' facts: {key: '/kythe/text/encoding' value: 'second'}"
+                + " facts: {key: '/kythe/text' value: 'first'}",
+            "ticket: 'kythe:#node' facts: {key: '/not/kythe/fact' value: 'val'}",
+            "ticket: 'kythe:#node' edge_groups: {key: '/kythe/edge/param' value: {"
+                + " edges: {ticket: 'kythe:#target' ordinal: 1}"
+                + " edges: {ticket: 'kythe:#tgt' ordinal: 2}"
+                + " edges: {ticket: 'kythe:#target' ordinal: 0}}}",
+            "ticket: 'kythe:#node' edge_groups: {key: '/not/kythe/edge' value: {"
+                + " edges: {ticket: 'kythe:#target'}}}",
+            "ticket: 'kythe:#record' facts: {key: '/kythe/node/kind' value: 'record'}",
+            "ticket: 'kythe:#record' facts: {key: '/kythe/node/kind' value: 'record'}"
+                + " facts: {key: '/kythe/subkind' value: 'class'}",
+            "ticket: 'kythe:#node' facts: {key: '/kythe/node/kind' value: 'something'}",
+            "ticket: 'kythe:#node' facts: {key: '/kythe/subkind' value: 'something'}"),
+        ImmutableList.of(
+            "source: {corpus: 'c' signature: 's'}",
+            "source: {signature: 'node'} fact: {kythe_name: TEXT value: 'first'}"
+                + " fact: {kythe_name: TEXT_ENCODING value: 'second'}",
+            "source: {signature: 'node'} fact: {generic_name: '/not/kythe/fact' value: 'val'}",
+            "source: {signature: 'node'}"
+                + " edge: {kythe_kind: PARAM ordinal: 0 target: {signature: 'target'}}"
+                + " edge: {kythe_kind: PARAM ordinal: 1 target: {signature: 'target'}}"
+                + " edge: {kythe_kind: PARAM ordinal: 2 target: {signature: 'tgt'}}",
+            "source: {signature: 'node'}"
+                + " edge: {generic_kind: '/not/kythe/edge' target: {signature: 'target'}}",
+            "source: {signature: 'record'} kythe_kind: RECORD",
+            "source: {signature: 'record'} kythe_kind: RECORD kythe_subkind: CLASS",
+            "source: {signature: 'node'} generic_kind: 'something'",
+            "source: {signature: 'node'} generic_subkind: 'something'"));
   }
 
   public void testConvertToSchemaEntry() {

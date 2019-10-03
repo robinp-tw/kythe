@@ -1,4 +1,22 @@
+/*
+ * Copyright 2019 The Kythe Authors. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.google.devtools.kythe.util.schema;
+
+import static com.google.devtools.kythe.util.KytheURI.parseVName;
 
 import com.google.devtools.kythe.proto.Internal.Source;
 import com.google.devtools.kythe.proto.Schema.Edge;
@@ -21,7 +39,7 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Utility to convert to/from {@link Node} and {@link Entry} protos. */
+/** Utility to convert to/from {@link Node}, {@link Entry}, and {@link Source} protos. */
 public final class Nodes {
   private Nodes() {}
 
@@ -151,6 +169,23 @@ public final class Nodes {
         (kind, edges) ->
             src.putEdgeGroups(kind, Source.EdgeGroup.newBuilder().addAllEdges(edges).build()));
     return src.build();
+  }
+
+  /** Converts a {@link Source} to a {@link Node}. */
+  public static Node fromSource(Source src) {
+    Node.Builder node = Node.newBuilder().setSource(parseVName(src.getTicket()));
+    for (Map.Entry<String, ByteString> fact : src.getFactsMap().entrySet()) {
+      node.addFactBuilder().setGenericName(fact.getKey()).setValue(fact.getValue());
+    }
+    for (Map.Entry<String, Source.EdgeGroup> group : src.getEdgeGroupsMap().entrySet()) {
+      for (Source.Edge edge : group.getValue().getEdgesList()) {
+        node.addEdgeBuilder()
+            .setGenericKind(group.getKey())
+            .setTarget(parseVName(edge.getTicket()))
+            .setOrdinal(edge.getOrdinal());
+      }
+    }
+    return normalizeNode(node.build());
   }
 
   /** Converts a {@link Storage.Entry} to an {@link Entry}. */

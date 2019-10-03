@@ -1,3 +1,5 @@
+load("@rules_java//java:defs.bzl", "java_library", "java_plugin")
+
 package(default_visibility = ["//kythe:default_visibility"])
 
 java_library(
@@ -18,7 +20,10 @@ java_plugin(
 java_library(
     name = "autovalue",
     exported_plugins = [":auto_plugin"],
-    exports = ["@com_google_auto_value_auto_value//jar"],
+    exports = [
+        "@com_google_auto_value_auto_value//jar",
+        "@javax_annotation_jsr250_api//jar",
+    ],
 )
 
 java_plugin(
@@ -34,5 +39,8 @@ java_plugin(
 java_library(
     name = "autoservice",
     exported_plugins = [":auto_service_plugin"],
-    exports = ["@com_google_auto_service_auto_service//jar"],
+    exports = [
+        "@com_google_auto_service_auto_service//jar",
+        "@javax_annotation_jsr250_api//jar",
+    ],
 )
