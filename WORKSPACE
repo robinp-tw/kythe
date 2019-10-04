@@ -31,6 +31,16 @@ nixpkgs_package(
 )
 
 nixpkgs_package(
+  name = "python",
+  repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
+)
+
+nixpkgs_package(
+  name = "python3",
+  repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
+)
+
+nixpkgs_package(
   name = "flex",
   repositories = { "nixpkgs": "@nixpkgs//:default.nix" },
 )
@@ -107,6 +117,8 @@ load("//:setup.bzl", "kythe_rule_repositories", "maybe")
 
 # NOTE(treetide): local modification, we hardwired the nix-based values here.
 register_toolchains("//tools/build_rules/lexyacc:lexyacc_local_toolchain")
+
+register_toolchains("//:py_pair_toolchain")
 
 kythe_rule_repositories()
 
