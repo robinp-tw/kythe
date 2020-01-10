@@ -1,6 +1,7 @@
 package(default_visibility = ["//visibility:private"])
 
 load("//:version.bzl", "MAX_VERSION", "MIN_VERSION")
+load("@bazel_gazelle//:def.bzl", "gazelle")
 
 exports_files(glob(["*"]))
 
@@ -56,3 +57,9 @@ toolchain(
   toolchain = ":my_python_pairs",
   toolchain_type = "@rules_python//python:toolchain_type",
 )
+
+# gazelle:build_file_name BUILD
+# gazelle:exclude kythe
+# gazelle:exclude third_party
+# gazelle:prefix kythe.io
+gazelle(name = "gazelle")

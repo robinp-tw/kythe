@@ -21,7 +21,6 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.nio.file.LinkOption.NOFOLLOW_LINKS;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
@@ -81,6 +80,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -141,6 +141,7 @@ public class JavaCompilationUnitExtractor {
   private final String jdkJar;
   private final String rootDirectory;
   private final FileVNames fileVNames;
+  private String systemDir;
 
   /**
    * Creates an instance of the JavaExtractor to store java compilation information in an .kindex
@@ -189,6 +190,14 @@ public class JavaCompilationUnitExtractor {
     }
   }
 
+  /**
+   * Use this value for the -system javac option. {@code systemDir} should either be a path to the
+   * system module directory or "none" which is a special value to javac.
+   */
+  public void useSystemDirectory(String systemDir) {
+    this.systemDir = systemDir;
+  }
+
   private CompilationUnit buildCompilationUnit(
       String target,
       Iterable<String> options,
@@ -208,6 +217,7 @@ public class JavaCompilationUnitExtractor {
       unit.addSourceFile(sourceFile);
     }
     unit.setOutputKey(outputPath);
+    unit.setWorkingDirectory(rootDirectory);
     unit.addDetails(
         Any.newBuilder()
             .setTypeUrl(JAVA_DETAILS_URL)
@@ -318,7 +328,6 @@ public class JavaCompilationUnitExtractor {
    * Returns a new list with the same options except header/source destination directory options.
    */
   private static ImmutableList<String> removeDestDirOptions(Iterable<String> options) {
-    // TODO(#3671): Option.D needs to remain in for module support, fix either here or in indexing.
     return ModifiableOptions.of(options)
         .removeOptions(EnumSet.of(Option.D, Option.S, Option.H))
         .build();
@@ -412,7 +421,16 @@ public class JavaCompilationUnitExtractor {
           // the correct sourcepath to add is the directory containing that
           // package.
           String packageSubDir = packageName.replace('.', '/');
-          String path = compilationUnit.getSourceFile().toUri().getPath();
+          URI uri = compilationUnit.getSourceFile().toUri();
+          // If the user included source files in their jars, we don't record anything special here
+          // because we pick up this source jar and the classpath/sourcepath usage with our other
+          // compiler hooks.
+          if ("jar".equals(uri.getScheme())) {
+            logger.atWarning().log(
+                "Detected a source in a jar file: %s - %s", uri, compilationUnit);
+            continue;
+          }
+          String path = uri.getPath();
           // This needs to be lastIndexOf as there are source jars that
           // contain the same package name in the files contained in them
           // as the path the source jars live in. As we extract the source
@@ -435,7 +453,12 @@ public class JavaCompilationUnitExtractor {
       throws ExtractionException {
     for (InputUsageRecord input : fileManager.getUsages()) {
       processRequiredInput(
-          input.fileObject(), input.location(), fileManager, sourceFiles, genSrcDir, results);
+          input.fileObject(),
+          input.location().orElse(null),
+          fileManager,
+          sourceFiles,
+          genSrcDir,
+          results);
     }
   }
 
@@ -584,7 +607,7 @@ public class JavaCompilationUnitExtractor {
         }
       } catch (IOException e) {
         throw new ExtractionException(
-            String.format("Unable to read file content of %s", strippedPath), false);
+            String.format("Unable to read file content of %s", strippedPath), e, false);
       }
     }
   }
@@ -810,7 +833,7 @@ public class JavaCompilationUnitExtractor {
 
       // Ensure generated source directory is relative to root.
       genSrcDir =
-          genSrcDir.transform(
+          genSrcDir.map(
               p -> Paths.get(ExtractorUtils.tryMakeRelative(rootDirectory, p.toString())));
 
       for (String source : sources) {
@@ -818,6 +841,7 @@ public class JavaCompilationUnitExtractor {
       }
 
       getAdditionalSourcePaths(compilationUnits, results);
+      addSystemFiles(results);
 
       // Find files potentially used for resolving .* imports.
       findOnDemandImportedFiles(compilationUnits, fileManager);
@@ -854,6 +878,33 @@ public class JavaCompilationUnitExtractor {
         fileManager.setLocation(location, files);
       } catch (IOException e) {
         throw new ExtractionException(String.format("Couldn't set %s", location), e, false);
+      }
+    }
+  }
+
+  /**
+   * Adds the files from "system" directory. When --system=DIR option is present, the compiler looks
+   * for system classes (e.g., java.lang.*) in DIR, which contains two files: DIR/lib/jrt-fs.jar and
+   * DIR/lib/modules. The former is a regular jar containing the implementation of a "module" file
+   * system, and the latter contains such file system. The analyzer will be also invoked with
+   * --system and thus will need them.
+   */
+  private void addSystemFiles(AnalysisResults results) throws ExtractionException {
+    if (Strings.isNullOrEmpty(systemDir)) {
+      return;
+    }
+    for (String fname : ImmutableList.of("jrt-fs.jar", "modules")) {
+      Path modPath = Paths.get(systemDir, "lib", fname);
+      String relativePath = ExtractorUtils.tryMakeRelative(rootDirectory, modPath.toString());
+      if (results.fileContents.containsKey(relativePath)) {
+        continue;
+      }
+      try {
+        results.fileContents.put(relativePath, Files.readAllBytes(modPath));
+        results.relativePaths.put(relativePath, relativePath);
+      } catch (IOException e) {
+        throw new ExtractionException(
+            String.format("Bad system directory, cannot read %s", modPath), e, false);
       }
     }
   }

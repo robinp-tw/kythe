@@ -44,6 +44,7 @@ cc_library(
     deps = [
         "@com_github_google_glog//:glog",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
         "@com_googlesource_code_re2//:re2",
     ],
 )
@@ -76,14 +77,15 @@ cc_library(
         "//kythe/proto:storage_cc_proto",
         "@com_github_google_glog//:glog",
         "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_protobuf//:protobuf",
         "@com_googlesource_code_re2//:re2",
     ],
 )
 
-cc_library(
-    name = "cmd_lib",
+cc_binary(
+    name = "verifier",
     srcs = [
         "verifier_main.cc",
     ],
@@ -92,6 +94,7 @@ cc_library(
         "-Wno-unused-variable",
         "-Wno-implicit-fallthrough",
     ],
+    visibility = [PUBLIC_VISIBILITY],
     deps = [
         ":lib",
         "//kythe/proto:storage_cc_proto",
@@ -104,22 +107,11 @@ cc_library(
     ],
 )
 
-cc_binary(
-    name = "verifier",
-    visibility = [PUBLIC_VISIBILITY],
-    deps = [
-        ":cmd_lib",
-    ],
-)
-
-cc_library(
-    name = "testlib",
-    testonly = 1,
+cc_test(
+    name = "test",
+    size = "small",
     srcs = [
         "verifier_unit_test.cc",
-    ],
-    hdrs = [
-        "verifier.h",
     ],
     copts = [
         "-Wno-non-virtual-dtor",
@@ -133,13 +125,5 @@ cc_library(
         "//third_party:gtest",
         "@com_github_google_glog//:glog",
         "@com_google_protobuf//:protobuf",
-    ],
-)
-
-cc_test(
-    name = "test",
-    size = "small",
-    deps = [
-        ":testlib",
     ],
 )
