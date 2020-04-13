@@ -1,4 +1,8 @@
-#!/usr/bin/env -S bash -e
+#!/usr/bin/env bash
+
+# Note: not all coreutils env support -S (only from 4.8), so setting -e
+# rather here.
+set -e
 
 # This script will be run bazel when building process starts to
 # generate key-value information that represents the status of the

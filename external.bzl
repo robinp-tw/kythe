@@ -16,12 +16,14 @@ load("@rules_python//python:repositories.bzl", "py_repositories")
 load("@bazel_toolchains//repositories:repositories.bzl", bazel_toolchains_repositories = "repositories")
 
 def _rule_dependencies():
+    # Note: go and python managed by nix
+
     go_rules_dependencies()
-    go_register_toolchains()
+    #go_register_toolchains()
     gazelle_dependencies()
     rules_java_dependencies()
     rules_proto_dependencies()
-    py_repositories()
+    #py_repositories()
     bazel_toolchains_repositories()
 
 def _gazelle_ignore(**kwargs):

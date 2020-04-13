@@ -8,6 +8,9 @@ with pkgs;
       cp -r ${go} $out
       chmod +wx $out/share/go
       touch $out/share/go/iamhere  # Needs to be a regular file for bazel go_wrap_sdk rule.
+
+      # Needs to be writeable, so nix sandbox doesn't complain. Don't ask.
+      chmod +wx $out
     '';
   };
 }

@@ -8,7 +8,10 @@ startup --host_jvm_args=-Dbazel.DigestFunction=SHA256
 build --strategy=TypeScriptCompile=sandboxed,local
 
 # Compatibility flags to avoid regressions.
-build --incompatible_disallow_empty_glob
+# Note(treetide): commented, stops python things in bazel 2.1 (at least with
+# nix-managed python). Complains about '*.dylib' empty in some python target
+# glob.
+#build --incompatible_disallow_empty_glob
 
 # Required for build_bazel_rules_nodejs
 common --experimental_allow_incremental_repository_updates
