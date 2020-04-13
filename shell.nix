@@ -8,6 +8,8 @@ with pkgs;
       # TODO(robinp): pull in with nixpkgs? now bazel-build works if triggered
       # from nix-shell, but a pure nix-build would fail?
       graphviz python go coreutils
+      # for git lint hook
+      arcanist
     ];
     shellHook = ''
       echo === Generating .bazelrc.nix fragment.
