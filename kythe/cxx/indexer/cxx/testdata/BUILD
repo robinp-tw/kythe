@@ -1,7 +1,13 @@
 package(default_visibility = ["//kythe:default_visibility"])
 
+exports_files(
+    ["test_vnames.json"],
+    visibility = ["//kythe:default_visibility"],
+)
+
 load(
     "//tools/build_rules/verifier_test:cc_indexer_test.bzl",
+    "cc_extract_kzip",
     "cc_extractor_test",
     "cc_indexer_test",
     "objc_indexer_test",
@@ -673,6 +679,16 @@ cc_indexer_test(
 )
 
 cc_indexer_test(
+    name = "usr_macro",
+    srcs = ["basic/usr_macro.cc"],
+    check_for_singletons = True,
+    experimental_usr_byte_size = 20,
+    ignore_dups = True,
+    ignore_unimplemented = True,
+    tags = ["basic"],
+)
+
+cc_indexer_test(
     name = "usr_record",
     srcs = ["basic/usr_record.cc"],
     check_for_singletons = True,
@@ -847,6 +863,29 @@ cc_indexer_test(
     tags = [
         "basic",
     ],
+)
+
+cc_extract_kzip(
+    name = "vname_corpus_kzip",
+    srcs = ["basic/vname_corpus.cc"],
+    corpus = "unit",
+    vnames_config = "basic/vname_corpus.json",
+)
+
+cc_indexer_test(
+    name = "vname_corpus",
+    srcs = [":vname_corpus_kzip"],
+    tags = [
+        "basic",
+    ],
+    use_compilation_corpus_as_default = True,
+)
+
+cc_indexer_test(
+    name = "macro_body",
+    srcs = ["basic/macro_body.cc"],
+    ignore_dups = True,
+    tags = ["basic"],
 )
 
 test_suite(
@@ -1086,7 +1125,6 @@ cc_indexer_test(
     name = "function_operator_overload_names",
     size = "small",
     srcs = ["function/function_operator_overload_names.cc"],
-    ignore_dups = True,
     tags = ["function"],
 )
 
@@ -1573,7 +1611,15 @@ test_suite(
 cc_indexer_test(
     name = "rec_agg_init",
     srcs = ["rec/rec_agg_init.cc"],
-    tags = ["rec"],
+    # The compiler-generated move constructor inserts a DeclRefExpr to the enclosing class for each member at the class name.
+    # TODO(shahms): Suppress these spurious references.
+    # Additionally, clang visits aggregate init twice; once as the syntactic form and once in the semantic.
+    ignore_dups = True,
+    std = "c++17",
+    tags = [
+        "c++17",
+        "rec",
+    ],
 )
 
 cc_indexer_test(
@@ -1647,7 +1693,8 @@ cc_indexer_test(
 cc_indexer_test(
     name = "rec_designated_initializer",
     srcs = ["rec/rec_designated_initializer.c"],
-    ignore_dups = True,  # clang visits these expressions multiple times.
+    # Clang visits aggregate init twice; once as the syntactic form and once in the semantic.
+    ignore_dups = True,
     std = "c99",
     tags = ["rec"],
 )
@@ -1787,6 +1834,12 @@ cc_indexer_test(
     name = "rec_class_member_ptr",
     srcs = ["rec/rec_class_member_ptr.cc"],
     check_for_singletons = True,
+    tags = ["rec"],
+)
+
+cc_indexer_test(
+    name = "rec_ctor_dtor_ref_class",
+    srcs = ["rec/rec_ctor_dtor_ref_class.cc"],
     tags = ["rec"],
 )
 
@@ -1989,6 +2042,13 @@ cc_indexer_test(
 cc_indexer_test(
     name = "template_dependent_dtor_qualified",
     srcs = ["template/template_dependent_dtor_qualified.cc"],
+    ignore_dups = True,
+    tags = ["template"],
+)
+
+cc_indexer_test(
+    name = "template/template_dependent_name_ref",
+    srcs = ["template/template_dependent_name_ref.cc"],
     ignore_dups = True,
     tags = ["template"],
 )
@@ -2774,13 +2834,12 @@ objc_indexer_test(
     deps = ["objc/categories/extension.h"],
 )
 
-# This test passes on darwin but fails on Linux.
 objc_indexer_test(
-    name = "extension_property_xcode",
-    srcs = ["objc/categories/extension_property_xcode.m"],
-    restricted_to = ["//buildenv:darwin"],
+    name = "extension_property",
+    srcs = ["objc/categories/extension_property.m"],
+    ignore_dups = True,
     tags = ["objc"],
-    deps = ["objc/categories/extension_property_xcode.h"],
+    deps = ["objc/categories/extension_property.h"],
 )
 
 objc_indexer_test(
@@ -3075,12 +3134,10 @@ objc_indexer_test(
     tags = ["objc"],
 )
 
-# This test passes on darwin but fails on linux. The version of syntax
-# supported appears to be dependent on the machine.
 objc_indexer_test(
-    name = "property_decl_defn_xcode_only",
-    srcs = ["objc/property_decl_defn_xcode_only.m"],
-    restricted_to = ["//buildenv:darwin"],
+    name = "property_decl_defn_synth",
+    srcs = ["objc/property_decl_defn_synth.m"],
+    ignore_dups = True,
     tags = ["objc"],
 )
 
@@ -3155,7 +3212,6 @@ objc_indexer_test(
 objc_indexer_test(
     name = "selector",
     srcs = ["objc/selector.m"],
-    restricted_to = ["//buildenv:darwin"],
     tags = ["objc"],
 )
 
@@ -3169,7 +3225,6 @@ objc_indexer_test(
 objc_indexer_test(
     name = "subscript_ref",
     srcs = ["objc/subscript_ref.m"],
-    restricted_to = ["//buildenv:darwin"],
     tags = ["objc"],
 )
 

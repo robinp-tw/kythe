@@ -67,6 +67,7 @@ _INDEXER_FLAGS = {
     "ignore_unimplemented": False,
     "index_template_instantiations": True,
     "ibuild_config": "",
+    "use_compilation_corpus_as_default": False,
 }
 
 def _compiler_options(ctx, extractor_toolchain, copts, cc_info):
@@ -130,9 +131,9 @@ def _compile_and_link(ctx, cc_info_providers, sources, headers):
         linking_contexts = [provider.linking_context for provider in cc_info_providers],
     )
     return struct(
-        transitive_library_file = linking_out,
         compilation_context = compile_ctx,
         linking_context = linking_ctx,
+        transitive_library_file = linking_out,
     )
 
 def _flag(name, typename, value):
@@ -213,7 +214,7 @@ def _cc_kythe_proto_library_aspect_impl(target, ctx):
         mnemonic = "GenerateKytheCCProto",
     )
     cc_info_providers = [lib[CcInfo] for lib in [target, ctx.attr._runtime] if CcInfo in lib]
-    cc_context = _compile_and_link(ctx, cc_info_providers, sources = sources, headers = headers)
+    cc_context = _compile_and_link(ctx, cc_info_providers, headers = headers, sources = sources)
     return [
         _KytheProtoInfo(files = depset(sources + headers)),
         CcInfo(
@@ -250,9 +251,10 @@ _cc_kythe_proto_library_aspect = aspect(
 )
 
 def _cc_kythe_proto_library(ctx):
+    files = [dep[_KytheProtoInfo].files for dep in ctx.attr.deps]
     return [
         ctx.attr.deps[0][CcInfo],
-        DefaultInfo(files = ctx.attr.deps[0][_KytheProtoInfo].files),
+        DefaultInfo(files = depset([], transitive = files)),
     ]
 
 cc_kythe_proto_library = rule(
@@ -273,15 +275,21 @@ def _cc_extract_kzip_impl(ctx):
         for src in ctx.attr.srcs + ctx.attr.deps
         if CcInfo in src
     ])
-    opts, env = _compiler_options(ctx, extractor_toolchain, ctx.attr.opts, cc_info)
+    opts, cc_env = _compiler_options(ctx, extractor_toolchain, ctx.attr.opts, cc_info)
+    if ctx.attr.corpus:
+        env = {"KYTHE_CORPUS": ctx.attr.corpus}
+        env.update(cc_env)
+    else:
+        env = cc_env
+
     outputs = depset([
         extract(
             srcs = depset([src]),
             ctx = ctx,
+            env = env,
             extractor = extractor_toolchain.extractor_binary,
             kzip = ctx.actions.declare_file("{}/{}.kzip".format(ctx.label.name, src.basename)),
             opts = opts,
-            env = env,
             vnames_config = ctx.file.vnames_config,
             deps = depset(
                 direct = ctx.files.srcs,
@@ -295,9 +303,11 @@ def _cc_extract_kzip_impl(ctx):
         for src in ctx.files.srcs
         if not src.path.endswith(".h")  # Don't extract headers.
     ])
-    for dep in ctx.attr.deps:
-        if CxxCompilationUnits in dep:
-            outputs += dep[CxxCompilationUnits].files
+    outputs = depset(transitive = [outputs] + [
+        dep[CxxCompilationUnits].files
+        for dep in ctx.attr.deps
+        if CxxCompilationUnits in dep
+    ])
     return [
         DefaultInfo(files = outputs),
         CxxCompilationUnits(files = outputs),
@@ -325,6 +335,10 @@ cc_extract_kzip = rule(
         ),
         "opts": attr.string_list(
             doc = "Options which will be passed to the extractor as arguments.",
+        ),
+        "corpus": attr.string(
+            doc = "The compilation unit corpus to use.",
+            default = "",
         ),
         "vnames_config": attr.label(
             doc = "vnames_config file to be used by the extractor.",
@@ -553,10 +567,14 @@ def _cc_index_impl(ctx):
         if kzip not in ctx.files.deps
     ]
 
-    entries = depset(intermediates)
-    for dep in ctx.attr.deps:
-        if KytheEntries in dep:
-            entries += dep[KytheEntries].files
+    entries = depset(
+        intermediates,
+        transitive = [
+            dep[KytheEntries].files
+            for dep in ctx.attr.deps
+            if KytheEntries in dep
+        ],
+    )
 
     ctx.actions.run_shell(
         outputs = [ctx.outputs.entries],
@@ -772,7 +790,8 @@ def objc_indexer_test(
         deps = deps,
         tags = tags,
         size = size,
-        copts = ["-fblocks"],
+        # Newer ObjC features are only enabled on the "modern" runtime.
+        copts = ["-fblocks", "-fobjc-runtime=macosx"],
         restricted_to = restricted_to,
         bundled = bundled,
         expect_fail_verify = expect_fail_verify,

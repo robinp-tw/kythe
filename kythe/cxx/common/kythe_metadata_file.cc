@@ -113,8 +113,9 @@ absl::optional<std::string> FindCommentMetadata(
   return LoadCommentMetadata(buffer, comment_start,
                              comment_start + 3 + search_string.size());
 }
+}  // anonymous namespace
 
-absl::optional<MetadataFile::Rule> LoadMetaElement(
+absl::optional<MetadataFile::Rule> MetadataFile::LoadMetaElement(
     const proto::metadata::MappingRule& mapping) {
   using ::kythe::proto::metadata::MappingRule;
   if (mapping.type() == MappingRule::NOP) {
@@ -160,10 +161,9 @@ absl::optional<MetadataFile::Rule> LoadMetaElement(
     return absl::nullopt;
   }
 }
-}  // anonymous namespace
 
 std::unique_ptr<MetadataFile> KytheMetadataSupport::LoadFromJSON(
-    absl::string_view json) {
+    absl::string_view id, absl::string_view json) {
   proto::metadata::GeneratedCodeInfo metadata;
   google::protobuf::util::JsonParseOptions options;
   // Existing implementations specify message types using lower-case enum names,
@@ -178,19 +178,19 @@ std::unique_ptr<MetadataFile> KytheMetadataSupport::LoadFromJSON(
   std::vector<MetadataFile::Rule> rules;
   rules.reserve(metadata.meta().size());
   for (const auto& meta_element : metadata.meta()) {
-    if (auto rule = LoadMetaElement(meta_element)) {
+    if (auto rule = MetadataFile::LoadMetaElement(meta_element)) {
       rules.push_back(*std::move(rule));
     } else {
       return nullptr;
     }
   }
-  return MetadataFile::LoadFromRules(rules.begin(), rules.end());
+  return MetadataFile::LoadFromRules(id, rules.begin(), rules.end());
 }
 
 std::unique_ptr<kythe::MetadataFile> KytheMetadataSupport::ParseFile(
     const std::string& raw_filename, const std::string& filename,
     absl::string_view buffer) {
-  auto metadata = LoadFromJSON(buffer);
+  auto metadata = LoadFromJSON(raw_filename, buffer);
   if (!metadata) {
     LOG(WARNING) << "Failed loading " << raw_filename;
   }

@@ -48,7 +48,8 @@ export interface IndexerHost {
    * optionally specified to help disambiguate nodes with multiple declarations.
    * See the documentation of Context for more information.
    */
-  getSymbolName(sym: ts.Symbol, ns: TSNamespace, context?: Context): VName;
+  getSymbolName(sym: ts.Symbol, ns: TSNamespace, context?: Context): VName
+      |undefined;
   /**
    * scopedSignature computes a scoped name for a ts.Node.
    * E.g. if you have a function `foo` containing a block containing a variable
@@ -253,7 +254,8 @@ class SymbolVNameStore {
  * isParameterPropertyDeclaration wraps ts.isParameterPropertyDeclaration and
  * exposes an API that's compatible across TypeScript 3.5 & 3.6.
  */
-function isParameterPropertyDeclaration(node: ts.Node, parent: ts.Node): node is ts.ParameterPropertyDeclaration {
+function isParameterPropertyDeclaration(
+    node: ts.Node, parent: ts.Node): node is ts.ParameterPropertyDeclaration {
   // TODO: remove/inline once fully on TypeScript 3.6+
   return (ts.isParameterPropertyDeclaration as any)(node, parent);
 }
@@ -574,13 +576,14 @@ class StandardIndexerContext implements IndexerHost {
    * See the documentation of Context for more information.
    */
   getSymbolName(
-      sym: ts.Symbol, ns: TSNamespace, context: Context = Context.Any): VName {
+      sym: ts.Symbol, ns: TSNamespace, context: Context = Context.Any): VName
+      |undefined {
     const stored = this.symbolNames.get(sym, ns, context);
     if (stored) return stored;
 
     let declarations = sym.declarations;
-    if (declarations.length < 1) {
-      throw new Error('TODO: symbol has no declarations?');
+    if (!declarations || declarations.length < 1) {
+      return undefined;
     }
 
     // Disambiguate symbols with multiple declarations using a context.
@@ -751,6 +754,7 @@ class Visitor {
         return;
       }
       const kType = this.host.getSymbolName(sym, TSNamespace.TYPE);
+      if (!kType) continue;
       this.emitNode(kType, 'absvar');
       this.emitEdge(
           this.newAnchor(param.name), EdgeKind.DEFINES_BINDING, kType);
@@ -782,13 +786,34 @@ class Visitor {
    * - class implements => type
    * - interface implements => illegal
    */
-  visitHeritage(heritageClauses: ReadonlyArray<ts.HeritageClause>) {
+  visitHeritage(
+      classOrInterface: VName | undefined,
+      heritageClauses: ReadonlyArray<ts.HeritageClause>) {
     for (const heritage of heritageClauses) {
       if (heritage.token === ts.SyntaxKind.ExtendsKeyword && heritage.parent &&
           heritage.parent.kind !== ts.SyntaxKind.InterfaceDeclaration) {
         this.visit(heritage);
       } else {
         this.visitType(heritage);
+      }
+      // Add extends edges.
+      if (classOrInterface == null) {
+        // classOrInterface is null for anonymous classes.
+        // But anonymous classes can implement and extends other
+        // classes and interfaces. So currently this edge
+        // is missing. Once we have nodes for anonymous classes -
+        // we can add this missing edges.
+        continue;
+      }
+      for (const baseType of heritage.types) {
+        const type = this.typeChecker.getTypeAtLocation(baseType);
+        if (!type || !type.symbol) {
+          continue;
+        }
+        const vname = this.host.getSymbolName(type.symbol, TSNamespace.TYPE);
+        if (vname) {
+          this.emitEdge(classOrInterface, EdgeKind.EXTENDS, vname);
+        }
       }
     }
   }
@@ -802,11 +827,13 @@ class Visitor {
       return;
     }
     const kType = this.host.getSymbolName(sym, TSNamespace.TYPE);
-    this.emitNode(kType, 'interface');
-    this.emitEdge(this.newAnchor(decl.name), EdgeKind.DEFINES_BINDING, kType);
+    if (kType) {
+      this.emitNode(kType, 'interface');
+      this.emitEdge(this.newAnchor(decl.name), EdgeKind.DEFINES_BINDING, kType);
+    }
 
     if (decl.typeParameters) this.visitTypeParameters(decl.typeParameters);
-    if (decl.heritageClauses) this.visitHeritage(decl.heritageClauses);
+    if (decl.heritageClauses) this.visitHeritage(kType, decl.heritageClauses);
     for (const member of decl.members) {
       this.visit(member);
     }
@@ -821,6 +848,7 @@ class Visitor {
       return;
     }
     const kType = this.host.getSymbolName(sym, TSNamespace.TYPE);
+    if (!kType) return;
     this.emitNode(kType, 'talias');
     this.emitEdge(this.newAnchor(decl.name), EdgeKind.DEFINES_BINDING, kType);
 
@@ -864,6 +892,7 @@ class Visitor {
           return;
         }
         const name = this.host.getSymbolName(sym, TSNamespace.TYPE);
+        if (!name) return;
         this.emitEdge(this.newAnchor(node), EdgeKind.REF, name);
         return name;
       case ts.SyntaxKind.TypeReference:
@@ -908,7 +937,7 @@ class Visitor {
     // This can happen in cases of importing local modules, like
     //   declare namespace Foo {}
     //   import foo = Foo;
-    if (!ts.isSourceFile(sf)) return undefined;
+    if (!sf || !ts.isSourceFile(sf)) return undefined;
     return this.host.moduleName(sf.fileName);
   }
 
@@ -979,6 +1008,7 @@ class Visitor {
       const kRemoteValue =
           this.host.getSymbolName(remoteSym, TSNamespace.VALUE);
       const kLocalValue = this.host.getSymbolName(localSym, TSNamespace.VALUE);
+      if (!kRemoteValue || !kLocalValue) return;
 
       // The local import value is a "variable" with an "import" subkind, and
       // aliases its remote definition.
@@ -994,6 +1024,7 @@ class Visitor {
     if (remoteSym.flags & ts.SymbolFlags.Type) {
       const kRemoteType = this.host.getSymbolName(remoteSym, TSNamespace.TYPE);
       const kLocalType = this.host.getSymbolName(localSym, TSNamespace.TYPE);
+      if (!kRemoteType || !kLocalType) return;
 
       // The local import value is a "talias" (type alias) with an "import"
       // subkind, and aliases its remote definition.
@@ -1044,8 +1075,10 @@ class Visitor {
       // Check if module being imported is declared via `declare module`
       // and if so - output ref to that statement.
       const decl = moduleSym.valueDeclaration;
-      if (ts.isModuleDeclaration(decl)) {
-        const kModule =  this.host.getSymbolName(moduleSym, TSNamespace.NAMESPACE);
+      if (decl && ts.isModuleDeclaration(decl)) {
+        const kModule =
+            this.host.getSymbolName(moduleSym, TSNamespace.NAMESPACE);
+        if (!kModule) return;
         this.emitEdge(this.newAnchor(moduleRef), EdgeKind.REF_IMPORTS, kModule);
       }
     }
@@ -1117,6 +1150,7 @@ class Visitor {
           return;
         }
         const kModuleObject = this.host.getSymbolName(sym, TSNamespace.VALUE);
+        if (!kModuleObject) return;
         this.emitNode(kModuleObject, 'variable');
         this.emitEdge(
             this.newAnchor(name), EdgeKind.DEFINES_BINDING, kModuleObject);
@@ -1190,12 +1224,14 @@ class Visitor {
       // Emit a "property/reads" edge between the getter and the property
       const getter =
           this.host.getSymbolName(sym, TSNamespace.VALUE, Context.Getter);
+      if (!getter) return;
       this.emitEdge(getter, EdgeKind.PROPERTY_READS, implicitProp);
     }
     if (sym.declarations.find(ts.isSetAccessor)) {
       // Emit a "property/writes" edge between the setter and the property
       const setter =
           this.host.getSymbolName(sym, TSNamespace.VALUE, Context.Setter);
+      if (!setter) return;
       this.emitEdge(setter, EdgeKind.PROPERTY_WRITES, implicitProp);
     }
   }
@@ -1234,7 +1270,7 @@ class Visitor {
    * and that case is handled as part of the ordinary declaration handling.
    */
   visitExportDeclaration(decl: ts.ExportDeclaration) {
-    if (decl.exportClause) {
+    if (decl.exportClause && ts.isNamedExports(decl.exportClause)) {
       for (const exp of decl.exportClause.elements) {
         const localSym = this.host.getSymbolAtLocation(exp.name);
         if (!localSym) {
@@ -1244,24 +1280,26 @@ class Visitor {
         const remoteSym = this.typeChecker.getAliasedSymbol(localSym);
         const anchor = this.newAnchor(exp.name);
         // Aliased export; propertyName is the 'as <...>' bit.
-        const propertyAnchor = exp.propertyName ?
-            this.newAnchor(exp.propertyName) : null;
+        const propertyAnchor =
+            exp.propertyName ? this.newAnchor(exp.propertyName) : null;
         // Symbol is a value.
         if (remoteSym.flags & ts.SymbolFlags.Value) {
-          const kExport =
-              this.host.getSymbolName(remoteSym, TSNamespace.VALUE);
-          this.emitEdge(anchor, EdgeKind.REF, kExport);
-          if (propertyAnchor) {
-            this.emitEdge(propertyAnchor, EdgeKind.REF, kExport);
+          const kExport = this.host.getSymbolName(remoteSym, TSNamespace.VALUE);
+          if (kExport) {
+            this.emitEdge(anchor, EdgeKind.REF, kExport);
+            if (propertyAnchor) {
+              this.emitEdge(propertyAnchor, EdgeKind.REF, kExport);
+            }
           }
         }
         // Symbol is a type.
         if (remoteSym.flags & ts.SymbolFlags.Type) {
-          const kExport =
-              this.host.getSymbolName(remoteSym, TSNamespace.TYPE);
-          this.emitEdge(anchor, EdgeKind.REF, kExport);
-          if (propertyAnchor) {
-            this.emitEdge(propertyAnchor, EdgeKind.REF, kExport);
+          const kExport = this.host.getSymbolName(remoteSym, TSNamespace.TYPE);
+          if (kExport) {
+            this.emitEdge(anchor, EdgeKind.REF, kExport);
+            if (propertyAnchor) {
+              this.emitEdge(propertyAnchor, EdgeKind.REF, kExport);
+            }
           }
         }
       }
@@ -1321,10 +1359,11 @@ class Visitor {
           return undefined;
         }
         vname = this.host.getSymbolName(sym, TSNamespace.VALUE);
-        this.emitNode(vname, 'variable');
-
-        this.emitEdge(
-            this.newAnchor(decl.name), EdgeKind.DEFINES_BINDING, vname);
+        if (vname) {
+          this.emitNode(vname, 'variable');
+          this.emitEdge(
+              this.newAnchor(decl.name), EdgeKind.DEFINES_BINDING, vname);
+        }
 
         decl.name.forEachChild(child => this.visit(child));
         break;
@@ -1348,6 +1387,51 @@ class Visitor {
     return vname;
   }
 
+  /**
+   * Emit "overrides" edges if this method overrides extended classes or
+   * implemented interfaces, which are listed in the Heritage Clauses of
+   * a class or interface.
+   *     class X extends A implements B, C {}
+   *             ^^^^^^^^^-^^^^^^^^^^^^^^^----- `HeritageClause`s
+   * Look at each type listed in the heritage clauses and traverse its
+   * members. If the type has a member that matches the method visited in
+   * this function (`kFunc`), emit an "overrides" edge to that member.
+   */
+  emitOverridesEdgeForFunction(
+      funcSym: ts.Symbol, funcVName: VName,
+      parent: ts.ClassLikeDeclaration|ts.InterfaceDeclaration) {
+    if (parent.heritageClauses == null) {
+      return;
+    }
+    for (const heritage of parent.heritageClauses) {
+      for (const baseType of heritage.types) {
+        const type =
+            this.typeChecker.getTypeAtLocation(baseType.expression);
+        if (!type || !type.symbol || !type.symbol.members) {
+          continue;
+        }
+
+        const funcName = funcSym.name;
+        const funcFlags = funcSym.flags;
+
+        // Find a member of with the same type (same flags) and same name
+        // as the overriding method.
+        const overriddenCondition = (sym: ts.Symbol) =>
+            Boolean(sym.flags & funcFlags) && sym.name === funcName;
+
+        const overridden =
+            toArray(type.symbol.members.values()).find(overriddenCondition);
+        if (overridden) {
+          const base =
+              this.host.getSymbolName(overridden, TSNamespace.VALUE);
+          if (base) {
+            this.emitEdge(funcVName, EdgeKind.OVERRIDES, base);
+          }
+        }
+      }
+    }
+  }
+
   visitFunctionLikeDeclaration(decl: ts.FunctionLikeDeclaration) {
     this.visitDecorators(decl.decorators || []);
     let kFunc: VName;
@@ -1369,7 +1453,10 @@ class Visitor {
             `function declaration ${decl.name.getText()} has no symbol`);
         return;
       }
-      kFunc = this.host.getSymbolName(funcSym, TSNamespace.VALUE, context);
+      const vname =
+          this.host.getSymbolName(funcSym, TSNamespace.VALUE, context);
+      if (!vname) return;
+      kFunc = vname;
 
       const declAnchor = this.newAnchor(decl.name);
       this.emitNode(kFunc, 'function');
@@ -1404,43 +1491,12 @@ class Visitor {
             return;
           }
           const kParent = this.host.getSymbolName(parentSym, TSNamespace.TYPE);
-          this.emitEdge(kFunc, EdgeKind.CHILD_OF, kParent);
-        }
-
-        // Emit "overrides" edges if this method overrides extended classes or
-        // implemented interfaces, which are listed in the Heritage Clauses of
-        // a class or interface.
-        //     class X extends A implements B, C {}
-        //             ^^^^^^^^^-^^^^^^^^^^^^^^^----- `HeritageClause`s
-        // Look at each type listed in the heritage clauses and traverse its
-        // members. If the type has a member that matches the method visited in
-        // this function (`kFunc`), emit an "overrides" edge to that member.
-        if (funcSym && decl.parent.heritageClauses) {
-          for (const heritage of decl.parent.heritageClauses) {
-            for (const baseType of heritage.types) {
-              const baseSym =
-                  this.host.getSymbolAtLocation(baseType.expression);
-              if (!baseSym || !baseSym.members) {
-                continue;
-              }
-
-              const funcName = funcSym.name;
-              const funcFlags = funcSym.flags;
-
-              // Find a member of with the same type (same flags) and same name
-              // as the overriding method.
-              const overridenCondition = (sym: ts.Symbol) =>
-                  Boolean(sym.flags & funcFlags) && sym.name === funcName;
-
-              const overriden =
-                  toArray(baseSym.members.values()).find(overridenCondition);
-              if (overriden) {
-                this.emitEdge(
-                    kFunc, EdgeKind.OVERRIDES,
-                    this.host.getSymbolName(overriden, TSNamespace.VALUE));
-              }
-            }
+          if (kParent) {
+            this.emitEdge(kFunc, EdgeKind.CHILD_OF, kParent);
           }
+        }
+        if (funcSym) {
+          this.emitOverridesEdgeForFunction(funcSym, kFunc, decl.parent);
         }
       }
     }
@@ -1484,6 +1540,7 @@ class Visitor {
                 return;
               }
               const kParam = this.host.getSymbolName(sym, TSNamespace.VALUE);
+              if (!kParam) return;
               this.emitNode(kParam, 'variable');
 
               this.emitEdge(
@@ -1499,6 +1556,7 @@ class Visitor {
                   if (parentSym !== undefined) {
                     const kClass =
                         this.host.getSymbolName(parentSym, TSNamespace.TYPE);
+                    if (!kClass) return;
                     this.emitEdge(kParam, EdgeKind.CHILD_OF, kClass);
                   }
                 }
@@ -1557,6 +1615,7 @@ class Visitor {
     // module with declarations).
     const kNamespace = this.host.getSymbolName(sym, TSNamespace.NAMESPACE);
     const kValue = this.host.getSymbolName(sym, TSNamespace.VALUE);
+    if (!kNamespace || !kValue) return;
     // It's possible that same namespace appears multiple time. We need to
     // emit only single node for that namespace and single defines/binding
     // edge.
@@ -1584,6 +1643,7 @@ class Visitor {
 
   visitClassDeclaration(decl: ts.ClassDeclaration) {
     this.visitDecorators(decl.decorators || []);
+    let kClass: VName|undefined;
     if (decl.name) {
       const sym = this.host.getSymbolAtLocation(decl.name);
       if (!sym) {
@@ -1595,9 +1655,11 @@ class Visitor {
       // A 'class' declaration declares both a type (a 'record', representing
       // instances of the class) and a value (least ambigiously, also the
       // class declaration).
-      const kClass = this.host.getSymbolName(sym, TSNamespace.TYPE);
+      kClass = this.host.getSymbolName(sym, TSNamespace.TYPE);
+      if (!kClass) return;
       this.emitNode(kClass, 'record');
       const kClassCtor = this.host.getSymbolName(sym, TSNamespace.VALUE);
+      if (!kClassCtor) return;
       this.emitNode(kClassCtor, 'function');
 
       const anchor = this.newAnchor(decl.name);
@@ -1613,6 +1675,7 @@ class Visitor {
 
         const ctorVName =
             this.host.getSymbolName(ctorSymbol, TSNamespace.VALUE);
+        if (!ctorVName) return;
 
         this.emitNode(ctorVName, 'function');
         this.emitSubkind(ctorVName, Subkind.CONSTRUCTOR);
@@ -1622,7 +1685,7 @@ class Visitor {
       this.visitJSDoc(decl, kClass);
     }
     if (decl.typeParameters) this.visitTypeParameters(decl.typeParameters);
-    if (decl.heritageClauses) this.visitHeritage(decl.heritageClauses);
+    if (decl.heritageClauses) this.visitHeritage(kClass, decl.heritageClauses);
     for (const member of decl.members) {
       this.visit(member);
     }
@@ -1632,8 +1695,10 @@ class Visitor {
     const sym = this.host.getSymbolAtLocation(decl.name);
     if (!sym) return;
     const kType = this.host.getSymbolName(sym, TSNamespace.TYPE);
+    if (!kType) return;
     this.emitNode(kType, 'record');
     const kValue = this.host.getSymbolName(sym, TSNamespace.VALUE);
+    if (!kValue) return;
     this.emitNode(kValue, 'constant');
 
     const anchor = this.newAnchor(decl.name);
@@ -1648,6 +1713,7 @@ class Visitor {
     const sym = this.host.getSymbolAtLocation(decl.name);
     if (!sym) return;
     const kMember = this.host.getSymbolName(sym, TSNamespace.VALUE);
+    if (!kMember) return;
     this.emitNode(kMember, 'constant');
     this.emitEdge(this.newAnchor(decl.name), EdgeKind.DEFINES_BINDING, kMember);
   }
@@ -1663,6 +1729,7 @@ class Visitor {
       return;
     }
     const name = this.host.getSymbolName(sym, TSNamespace.VALUE);
+    if (!name) return;
     const anchor = this.newAnchor(node);
     this.emitEdge(anchor, EdgeKind.REF, name);
 
@@ -1675,6 +1742,7 @@ class Visitor {
         if (ctorSymbol) {
           const ctorVName =
               this.host.getSymbolName(ctorSymbol, TSNamespace.VALUE);
+          if (!ctorVName) return;
           this.emitEdge(anchor, EdgeKind.REF_CALL, ctorVName);
         }
       }
@@ -1699,6 +1767,7 @@ class Visitor {
     }
 
     const type = this.host.getSymbolName(sym, TSNamespace.TYPE);
+    if (!type) return;
     const thisAnchor = this.newAnchor(keyword);
     this.emitEdge(thisAnchor, EdgeKind.REF, type);
   }

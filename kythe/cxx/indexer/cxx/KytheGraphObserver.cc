@@ -63,6 +63,7 @@ struct ClaimedStringFormatter {
 absl::string_view ConvertRef(llvm::StringRef ref) {
   return absl::string_view(ref.data(), ref.size());
 }
+
 }  // anonymous namespace
 
 using clang::SourceLocation;
@@ -108,7 +109,7 @@ kythe::proto::VName KytheGraphObserver::VNameFromFileEntry(
       out_name.set_path(
           RelativizePath(ConvertRef(file_name), ConvertRef(working_directory)));
     } else {
-      out_name.set_path(file_entry->getName());
+      out_name.set_path(std::string(file_entry->getName()));
     }
     out_name.set_corpus(claimant_.corpus());
   }
@@ -412,7 +413,7 @@ void KytheGraphObserver::MetaHookDefines(const MetadataFile& meta,
         new_signature.append(std::to_string(rule->second.anchor_begin));
         new_signature.append("-");
         new_signature.append(std::to_string(rule->second.anchor_end));
-        remote.signature = new_signature;
+        remote.set_signature(new_signature);
         recorder_->AddProperty(remote, NodeKindID::kAnchor);
         recorder_->AddProperty(remote, PropertyID::kLocationStartOffset,
                                rule->second.anchor_begin);
@@ -431,6 +432,37 @@ void KytheGraphObserver::MetaHookDefines(const MetadataFile& meta,
       }
     }
   }
+
+  // Emit file-scope edges, if the anchor VName directly corresponds to a file.
+  if (!anchor.path().empty()) {
+    VNameRef file_vname(anchor);
+    file_vname.set_signature("");
+    file_vname.set_language("");
+    for (const auto& rule : meta.file_scope_rules()) {
+      EdgeKindID edge_kind;
+      if (of_spelling(rule.edge_out, &edge_kind)) {
+        if (MarkFileMetaEdgeEmitted(file_vname, meta)) {
+          VNameRef remote(rule.vname);
+          if (rule.reverse_edge) {
+            recorder_->AddEdge(remote, edge_kind, file_vname);
+          } else {
+            recorder_->AddEdge(file_vname, edge_kind, remote);
+          }
+        }
+      } else {
+        absl::FPrintF(stderr, "Unknown edge kind %s from metadata\n",
+                      rule.edge_out);
+      }
+    }
+  }
+}
+
+bool KytheGraphObserver::MarkFileMetaEdgeEmitted(const VNameRef& file_decl,
+                                                 const MetadataFile& meta) {
+  return file_meta_edges_emitted_
+      .emplace(std::string(file_decl.path()), std::string(file_decl.corpus()),
+               std::string(file_decl.root()), std::string(meta.id()))
+      .second;
 }
 
 void KytheGraphObserver::ApplyMetadataRules(
@@ -572,15 +604,15 @@ absl::optional<GraphObserver::NodeId> KytheGraphObserver::recordFileInitializer(
 VNameRef KytheGraphObserver::VNameRefFromNodeId(
     const GraphObserver::NodeId& node_id) const {
   VNameRef out_ref;
-  out_ref.language = absl::string_view(supported_language::kIndexerLang);
+  out_ref.set_language(absl::string_view(supported_language::kIndexerLang));
   if (const auto* token =
           clang::dyn_cast<KytheClaimToken>(node_id.getToken())) {
     token->DecorateVName(&out_ref);
     if (token->language_independent()) {
-      out_ref.language = absl::string_view();
+      out_ref.set_language(absl::string_view());
     }
   }
-  out_ref.signature = ConvertRef(node_id.IdentityRef());
+  out_ref.set_signature(ConvertRef(node_id.IdentityRef()));
   return out_ref;
 }
 
@@ -890,8 +922,9 @@ void KytheGraphObserver::assignUsr(const NodeId& node, llvm::StringRef usr,
                       std::min(hash.size(), static_cast<size_t>(byte_size))));
   VNameRef node_vname = VNameRefFromNodeId(node);
   VNameRef usr_vname;
-  usr_vname.signature = hex;
-  usr_vname.language = "usr";
+  usr_vname.set_corpus(type_token_.vname().corpus());
+  usr_vname.set_signature(hex);
+  usr_vname.set_language("usr");
   recorder_->AddProperty(usr_vname, NodeKindID::kClangUsr);
   recorder_->AddEdge(usr_vname, EdgeKindID::kClangUsr, node_vname);
 }
@@ -1053,7 +1086,7 @@ GraphObserver::NodeId KytheGraphObserver::getNodeIdForBuiltinType(
     LOG(ERROR) << "Missing builtin " << spelling.str();
     MarkedSource sig;
     sig.set_kind(MarkedSource::IDENTIFIER);
-    sig.set_pre_text(spelling);
+    sig.set_pre_text(std::string(spelling));
     builtins_.emplace(spelling.str(), Builtin{NodeId::CreateUncompressed(
                                                   getDefaultClaimToken(),
                                                   spelling.str() + "#builtin"),
@@ -1079,7 +1112,7 @@ void KytheGraphObserver::applyMetadataFile(clang::FileID id,
     return;
   }
   if (auto metadata = meta_supports_->ParseFile(
-          file->getName(),
+          std::string(file->getName()),
           absl::string_view(buffer->getBuffer().data(),
                             buffer->getBufferSize()),
           search_string)) {
@@ -1331,32 +1364,42 @@ const KytheClaimToken* KytheGraphObserver::getAnonymousNamespaceClaimToken(
     CHECK(main_source_file_token_ != nullptr);
     return main_source_file_token_;
   }
-  return getNamespaceClaimToken(loc);
+  return &getNamespaceTokens(loc).anonymous;
 }
 
 const KytheClaimToken* KytheGraphObserver::getNamespaceClaimToken(
     clang::SourceLocation loc) const {
+  return &getNamespaceTokens(loc).named;
+}
+
+const KytheGraphObserver::NamespaceTokens&
+KytheGraphObserver::getNamespaceTokens(clang::SourceLocation loc) const {
   auto* file_token = getClaimTokenForLocation(loc);
-  auto token = namespace_tokens_.find(file_token);
-  if (token != namespace_tokens_.end()) {
-    return &token->second;
+  auto [iter, inserted] =
+      namespace_tokens_.emplace(file_token, NamespaceTokens{});
+  if (inserted) {
+    // Named namespaces belong to the same corpus as structural types due to
+    // their use as extension points which may be opened from a file in any
+    // corpus, but should still refer to the same node.
+    iter->second.named.mutable_vname()->set_corpus(
+        type_token_.vname().corpus());
+    iter->second.named.set_rough_claimed(file_token->rough_claimed());
+    // Anonymous namespaces are unique to the translation in which they're
+    // defined, which we approximate by using the file's corpus.
+    iter->second.anonymous.mutable_vname()->set_corpus(
+        file_token->vname().corpus());
+    iter->second.anonymous.set_rough_claimed(file_token->rough_claimed());
   }
-  proto::VName vname;
-  vname.set_corpus(file_token->vname().corpus());
-  KytheClaimToken new_token;
-  new_token.set_vname(vname);
-  new_token.set_rough_claimed(file_token->rough_claimed());
-  namespace_tokens_.emplace(file_token, new_token);
-  return &namespace_tokens_.find(file_token)->second;
+  return iter->second;
 }
 
 void KytheGraphObserver::RegisterBuiltins() {
   auto RegisterBuiltin = [&](const std::string& name,
                              const MarkedSource& marked_source) {
-    builtins_.emplace(std::make_pair(
-        name, Builtin{NodeId::CreateUncompressed(getDefaultClaimToken(),
-                                                 name + "#builtin"),
-                      marked_source, false}));
+    builtins_.emplace(name,
+                      Builtin{NodeId::CreateUncompressed(getDefaultClaimToken(),
+                                                         name + "#builtin"),
+                              marked_source, false});
   };
   auto RegisterTokenBuiltin = [&](const std::string& name,
                                   const std::string& token) {
